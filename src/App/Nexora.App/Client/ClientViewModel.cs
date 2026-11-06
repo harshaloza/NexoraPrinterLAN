@@ -9,7 +9,7 @@ using Nexora.Shared.Windows;
 using Nexora.Transport;
 using Nexora.UI;
 
-namespace Nexora.Client.App;
+namespace Nexora.App.Client;
 
 public sealed class JobRow : ObservableObject
 {
@@ -45,21 +45,20 @@ public sealed record DeviceRow(DiscoveredReceiver Receiver)
     public string Version => Receiver.Announcement.AppVersion;
 }
 
-public sealed class MainViewModel : ObservableObject
+public sealed class ClientViewModel : ObservableObject
 {
     private readonly ClientEngine _engine;
     private readonly Action<string, string, bool> _notify;
 
-    public MainViewModel(ClientEngine engine, Action<string, string, bool> notify)
+    public ClientViewModel(ClientEngine engine, Action<string, string, bool> notify)
     {
         _engine = engine;
         _notify = notify;
-        SendTestPage = new AsyncCommand(async () => { await Task.Run(() => _engine.SubmitTestPage()); Page = "jobs"; });
+        SendTestPage = new AsyncCommand(async () => { await Task.Run(() => _engine.SubmitTestPage()); Navigate?.Invoke("jobs"); });
         CheckConnection = new AsyncCommand(CheckConnectionAsync);
         Discover = new AsyncCommand(async () => { await _engine.DiscoverNowAsync(); Refresh(); });
         UseSelectedDevice = new RelayCommand(UseDevice, () => SelectedDevice is not null);
         InstallQueue = new AsyncCommand(() => RunQueueScript("Install-NexoraQueue.ps1"));
-        RemoveQueue = new AsyncCommand(async () => { if (Dialogs.Confirm($"Remove the '{NexoraInfo.PrinterQueueName}' printer from Windows?")) await RunQueueScript("Uninstall-NexoraQueue.ps1"); });
         SetDefaultPrinter = new RelayCommand(() => { Winspool.SetDefaultPrinter(_engine.Config.QueueName); Refresh(); }, () => QueueInstalled && !QueueIsDefault);
         OpenPrinterSettings = new RelayCommand(() => Shell.Open("ms-settings:printers"));
         Retry = new RelayCommand(p => { if (p is JobRow r) { _engine.Retry(r.Id); Refresh(); } });
@@ -73,8 +72,8 @@ public sealed class MainViewModel : ObservableObject
     }
 
     // ------------------------------------------------------------ navigation
-    private string _page = "dashboard";
-    public string Page { get => _page; set => Set(ref _page, value); }
+    /// <summary>Asks the shell to show another page (e.g. Print jobs after sending a test page).</summary>
+    public Action<string>? Navigate { get; set; }
 
     // ------------------------------------------------------------ dashboard
     private bool? _captureOk, _queueOk, _receiverOk;
@@ -115,9 +114,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<JobRow> Jobs { get; } = [];
 
     // ------------------------------------------------------------ settings page
-    private bool _startWithWindows, _autoDiscovery, _notifications;
+    private bool _autoDiscovery, _notifications;
     private string _manualAddress = "", _discoveryPort = "", _transportPort = "", _retentionDays = "", _maxJobMb = "", _pairingInput = "", _pairingStatus = "";
-    public bool StartWithWindows { get => _startWithWindows; set => Set(ref _startWithWindows, value); }
     public bool AutoDiscovery { get => _autoDiscovery; set => Set(ref _autoDiscovery, value); }
     public bool Notifications { get => _notifications; set => Set(ref _notifications, value); }
     public string ManualAddress { get => _manualAddress; set => Set(ref _manualAddress, value); }
@@ -135,7 +133,6 @@ public sealed class MainViewModel : ObservableObject
     public AsyncCommand Discover { get; }
     public RelayCommand UseSelectedDevice { get; }
     public AsyncCommand InstallQueue { get; }
-    public AsyncCommand RemoveQueue { get; }
     public RelayCommand SetDefaultPrinter { get; }
     public RelayCommand OpenPrinterSettings { get; }
     public RelayCommand Retry { get; }
@@ -276,7 +273,6 @@ public sealed class MainViewModel : ObservableObject
     private void LoadSettings()
     {
         var c = _engine.Config;
-        StartWithWindows = StartupRegistration.IsEnabled("NexoraClient");
         AutoDiscovery = c.AutoDiscovery;
         Notifications = c.ShowNotifications;
         ManualAddress = c.ManualReceiverAddress ?? "";
@@ -301,9 +297,7 @@ public sealed class MainViewModel : ObservableObject
                 c.DefaultTransportPort = int.Parse(TransportPort);
                 c.JobRetentionDays = Math.Max(1, int.Parse(RetentionDays));
                 c.MaxJobBytes = Math.Max(1, long.Parse(MaxJobMb)) * 1024 * 1024;
-                c.StartWithWindows = StartWithWindows;
             });
-            StartupRegistration.Set("NexoraClient", StartWithWindows);
             LoadSettings();
             Dialogs.Info("Settings saved.");
         }

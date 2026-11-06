@@ -24,6 +24,9 @@ public sealed class PrintQueue : IAsyncDisposable
     private Guid? _current;
     private CancellationTokenSource? _currentCts;
 
+    /// <summary>Integration-test seam: print through the driver into a file instead of the device. Never set by the product.</summary>
+    internal static Func<Guid, string?>? TestPrintToFile { get; set; }
+
     public PrintQueue(JobStore store, Func<ReceiverConfig> cfg, LogScope log)
     {
         _store = store;
@@ -102,6 +105,11 @@ public sealed class PrintQueue : IAsyncDisposable
                 _store.Update(id, x => x with { State = JobState.Failed, AwaitingPrint = false, ErrorCode = ErrorCodes.PrinterUnavailable, Message = "Saved but not printed: no destination printer selected on the receiver" });
                 continue;
             }
+            if (r.StoredFile is null || !File.Exists(r.StoredFile))
+            {
+                _store.Update(id, x => x with { State = JobState.Failed, AwaitingPrint = false, ErrorCode = ErrorCodes.NotFound, Message = "The document copy no longer exists on this PC (Keep copies of printed jobs is off); print it again from the client" });
+                continue;
+            }
 
             _current = id;
             _currentCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -118,9 +126,11 @@ public sealed class PrintQueue : IAsyncDisposable
                     Settings = r.Metadata.Settings,
                     FitToPrintableArea = cfg.Scaling == PrintScaling.FitToPrintableArea,
                     MaxRenderDpi = cfg.MaxRenderDpi,
-                }, (state, msg) => _store.Update(id, x => x with { State = state, Message = msg }), _currentCts.Token);
+                    PrintToFile = TestPrintToFile?.Invoke(id),
+                },(state, msg) => _store.Update(id, x => x with { State = state, Message = msg }), _currentCts.Token);
 
                 _store.Update(id, x => x with { State = outcome.State, ErrorCode = outcome.ErrorCode, Message = outcome.Message, SpoolerJobId = outcome.SpoolerJobId ?? x.SpoolerJobId });
+                if (outcome.State == JobState.Completed && !_cfg().KeepPrintedCopies) DeletePrintedCopy(id);
                 var lvl = outcome.State == JobState.Failed ? LogLevel.Error : LogLevel.Info;
                 _log.Root.Write(lvl, "print", "print.result", $"'{r.Metadata.DocumentName}' → {outcome.State.ToWire()}: {outcome.Message}",
                     new Dictionary<string, object?> { ["jobId"] = id, ["printer"] = printer, ["pages"] = outcome.PagesSent });
@@ -140,6 +150,30 @@ public sealed class PrintQueue : IAsyncDisposable
                 _currentCts.Dispose();
                 _currentCts = null;
             }
+        }
+    }
+
+    /// <summary>
+    /// The PDF is only the transport format. Once Windows has finished sending a job to the printer the copy is
+    /// removed, unless the user chose to keep copies. Test-mode jobs are never deleted here (that is their purpose).
+    /// </summary>
+    private void DeletePrintedCopy(Guid id)
+    {
+        var r = _store.Get(id);
+        if (r?.StoredFile is not { } file) return;
+        try
+        {
+            File.Delete(file);
+            File.Delete(Path.ChangeExtension(file, ".json"));
+            _store.Update(id, x => x with { StoredFile = null, Message = $"{x.Message}. Document copy removed (Keep copies of printed jobs is off)" });
+        }
+        catch (IOException e)
+        {
+            _log.Warn("print.cleanup", $"Could not remove the printed copy of '{r.Metadata.DocumentName}'", new { jobId = id }, e);
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            _log.Warn("print.cleanup", $"Could not remove the printed copy of '{r.Metadata.DocumentName}'", new { jobId = id }, e);
         }
     }
 

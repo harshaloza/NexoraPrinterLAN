@@ -22,6 +22,7 @@
     <ui:HealthToBrushConverter x:Key="HealthBrush"/>
     <BooleanToVisibilityConverter x:Key="BoolVis"/>
     <ui:InverseBoolToVisibilityConverter x:Key="InvBoolVis"/>
+    <ui:InverseBoolConverter x:Key="InvBool"/>
     <ui:EqualsToVisibilityConverter x:Key="PageVis"/>
     <ui:EqualsToBoolConverter x:Key="PageChecked"/>
 

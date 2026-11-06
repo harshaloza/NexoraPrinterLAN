@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 
-namespace Nexora.Receiver.App;
+namespace Nexora.App.Main;
 
 public partial class MainWindow : Window
 {

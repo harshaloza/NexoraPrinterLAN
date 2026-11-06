@@ -8,4 +8,7 @@
     <ProjectReference Include="..\..\Discovery\Nexora.Discovery\Nexora.Discovery.csproj" />
     <ProjectReference Include="..\..\PrinterIntegration\Nexora.PrinterIntegration\Nexora.PrinterIntegration.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nexora.Tests.Integration" />
+  </ItemGroup>
 </Project>

@@ -164,6 +164,48 @@ public class ClientEngineTests(ITestOutputHelper output)
         output.WriteLine($"Captured {rec.Metadata.SizeBytes} bytes; stored {stored}");
     }
 
+    [Fact]
+    public async Task Printed_copy_is_removed_unless_keep_copies_is_on()
+    {
+        if (Winspool.FindPrinter("Microsoft Print to PDF") is null)
+        {
+            output.WriteLine("SKIPPED: Microsoft Print to PDF queue not present");
+            return;
+        }
+        var outDir = Directory.CreateTempSubdirectory("nexora-printout").FullName;
+        Nexora.Receiver.Core.PrintQueue.TestPrintToFile = id => Path.Combine(outDir, id.ToString("N") + ".pdf");
+        try
+        {
+            foreach (bool keep in new[] { false, true })
+            {
+                await using var rx = await TestReceiver.StartAsync(c => { c.TestMode = false; c.DestinationPrinter = "Microsoft Print to PDF"; c.KeepPrintedCopies = keep; });
+                var (path, meta) = Jobs.MakePdf(pages: 2);
+                await using var s = await rx.ConnectAsync();
+                await s.SendJobAsync(meta, path, null, default);
+                JobStatus? st = null;
+                for (int i = 0; i < 150 && st?.State is not (JobState.Completed or JobState.Failed); i++)
+                {
+                    await Task.Delay(200);
+                    st = (await s.QueryStatusAsync([meta.JobId], default))[0];
+                }
+                Assert.Equal(JobState.Completed, st!.State);
+                var rec = rx.Host.Store.Get(meta.JobId)!;
+                if (keep) Assert.True(File.Exists(rec.StoredFile), "copy should be kept");
+                else
+                {
+                    Assert.Null(rec.StoredFile);
+                    Assert.Empty(Directory.GetFiles(rx.Host.Store.ReceivedFolder, "*.pdf"));
+                    Assert.Contains("copy removed", st.Message);
+                }
+                Assert.True(File.Exists(Path.Combine(outDir, meta.JobId.ToString("N") + ".pdf")), "driver output should exist");
+            }
+        }
+        finally
+        {
+            Nexora.Receiver.Core.PrintQueue.TestPrintToFile = null;
+        }
+    }
+
     [Fact] // receiver print path through a real installed driver (PDF output, no hardware)
     public async Task Receiver_print_path_renders_through_installed_driver()
     {

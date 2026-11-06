@@ -8,7 +8,7 @@ using Nexora.Shared.Pdf;
 using Nexora.Transport;
 using Nexora.UI;
 
-namespace Nexora.Receiver.App;
+namespace Nexora.App.Receiver;
 
 public sealed class ReceivedJobRow : ObservableObject
 {
@@ -24,7 +24,15 @@ public sealed class ReceivedJobRow : ObservableObject
     public string Printer { get => _printer; set => Set(ref _printer, value); }
     public string Details { get => _details; set => Set(ref _details, value); }
     public bool CanCancel { get => _canCancel; set => Set(ref _canCancel, value); }
-    public string? File { get; set; }
+    private string? _file;
+    private bool _hasFile;
+    public string? File
+    {
+        get => _file;
+        set { _file = value; HasFile = value is not null && System.IO.File.Exists(value); }
+    }
+    /// <summary>False once a printed job's copy was removed (Keep copies of printed jobs off).</summary>
+    public bool HasFile { get => _hasFile; private set => Set(ref _hasFile, value); }
 }
 
 public sealed class ReceiverViewModel : ObservableObject
@@ -91,8 +99,8 @@ public sealed class ReceiverViewModel : ObservableObject
         Refresh();
     }
 
-    private string _page = "dashboard";
-    public string Page { get => _page; set => Set(ref _page, value); }
+    /// <summary>Set by the shell; the printer list is not refreshed under the user while they pick a printer.</summary>
+    public bool PrintersPageActive { get; set; }
     public string Version => NexoraInfo.AppVersion;
 
     // ----------------------------------------------------------- dashboard
@@ -125,7 +133,7 @@ public sealed class ReceiverViewModel : ObservableObject
 
     // ----------------------------------------------------------- settings
     private string _name = "", _tcp = "", _udp = "", _bind = "", _allowed = "", _maxMb = "", _retention = "", _dpi = "";
-    private bool _startWithWindows, _discovery, _actualSize;
+    private bool _discovery, _actualSize, _keepCopies;
     public string ReceiverName { get => _name; set => Set(ref _name, value); }
     public string TcpPort { get => _tcp; set => Set(ref _tcp, value); }
     public string UdpPort { get => _udp; set => Set(ref _udp, value); }
@@ -134,9 +142,9 @@ public sealed class ReceiverViewModel : ObservableObject
     public string MaxJobMb { get => _maxMb; set => Set(ref _maxMb, value); }
     public string RetentionDays { get => _retention; set => Set(ref _retention, value); }
     public string MaxDpi { get => _dpi; set => Set(ref _dpi, value); }
-    public bool StartWithWindows { get => _startWithWindows; set => Set(ref _startWithWindows, value); }
     public bool DiscoveryEnabled { get => _discovery; set => Set(ref _discovery, value); }
     public bool ActualSize { get => _actualSize; set => Set(ref _actualSize, value); }
+    public bool KeepPrintedCopies { get => _keepCopies; set => Set(ref _keepCopies, value); }
 
     public AsyncCommand ToggleRunning { get; }
     public RelayCommand CopyPairing { get; }
@@ -165,7 +173,7 @@ public sealed class ReceiverViewModel : ObservableObject
         ListenText = _host.IsRunning ? $"TCP {_host.TransportPort} · UDP {(c.DiscoveryEnabled ? _host.DiscoveryPort.ToString() : "off")} · {(c.AllowedClientNetworks.Count == 0 ? "local subnet only" : string.Join(", ", c.AllowedClientNetworks))}" : "—";
         TestMode = c.TestMode;
         ModeText = c.TestMode ? "Test mode — received documents are saved, not printed" : "Print mode — received documents are printed automatically";
-        if (_tick++ % 4 == 0 && Page != "printers") LoadPrinters(keepSelection: true);
+        if (_tick++ % 4 == 0 && !PrintersPageActive) LoadPrinters(keepSelection: true);
         var dest = c.DestinationPrinter is null ? null : Printers.FirstOrDefault(p => p.Name == c.DestinationPrinter);
         PrinterReady = dest?.IsReady;
         DestinationText = c.DestinationPrinter is null ? "None selected"
@@ -266,9 +274,9 @@ public sealed class ReceiverViewModel : ObservableObject
         MaxJobMb = (c.MaxJobBytes / (1024 * 1024)).ToString();
         RetentionDays = c.JobRetentionDays.ToString();
         MaxDpi = c.MaxRenderDpi.ToString();
-        StartWithWindows = StartupRegistration.IsEnabled("NexoraReceiver");
         DiscoveryEnabled = c.DiscoveryEnabled;
         ActualSize = c.Scaling == PrintScaling.ActualSize;
+        KeepPrintedCopies = c.KeepPrintedCopies;
     }
 
     private async Task DoSaveSettingsAsync()
@@ -288,9 +296,8 @@ public sealed class ReceiverViewModel : ObservableObject
                 c.MaxRenderDpi = int.Parse(MaxDpi);
                 c.DiscoveryEnabled = DiscoveryEnabled;
                 c.Scaling = ActualSize ? PrintScaling.ActualSize : PrintScaling.FitToPrintableArea;
-                c.StartWithWindows = StartWithWindows;
+                c.KeepPrintedCopies = KeepPrintedCopies;
             });
-            StartupRegistration.Set("NexoraReceiver", StartWithWindows);
             LoadSettings();
             Refresh();
             Dialogs.Info("Settings saved." + (_host.IsRunning ? "" : $"\n\nThe receiver is not running: {_host.StartupError}"));

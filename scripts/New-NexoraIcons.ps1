@@ -52,5 +52,4 @@ function Write-Ico([string]$file, [string]$hex, [string]$glyph) {
     Write-Host "Wrote $file"
 }
 
-Write-Ico (Join-Path $OutDir 'nexora-client.ico') '#2F6FED' 'C'
-Write-Ico (Join-Path $OutDir 'nexora-receiver.ico') '#1E9E5A' 'R'
+Write-Ico (Join-Path $OutDir 'nexora.ico') '#2F6FED' 'N'

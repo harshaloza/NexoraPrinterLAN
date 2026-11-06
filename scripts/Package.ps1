@@ -1,22 +1,23 @@
 <#
-.SYNOPSIS  Publishes self-contained x64 builds and creates the Client and Receiver release packages in release\.
+.SYNOPSIS  Builds the Nexora Printer LAN Setup (MSI) into release\.
 .DESCRIPTION
-    Output:
-      release\NexoraPrinterLAN-Client-<ver>-win-x64\   (+ .zip)   install on the PC that prints (PC1)
-      release\NexoraPrinterLAN-Receiver-<ver>-win-x64\ (+ .zip)   install on the PC with the printer (PC2)
-    Packages are self-contained: the target PC does not need .NET installed.
-    Binaries are not code-signed unless -SignCertThumbprint is given (see docs\INSTALLATION.md, "Signing").
+    1. Runs the tests (unless -SkipTests)
+    2. Publishes NexoraPrinterLAN.exe and nexora.exe as self-contained single-file x64 programs (no .NET needed on target PCs)
+    3. Builds release\NexoraPrinterLAN-<ver>-x64.msi with WiX 4 (UI, Util and Firewall extensions from installer\msi\.wix)
+    One MSI serves both PCs: Setup asks whether this PC prints to another PC, receives and prints, or both.
+    Binaries and the MSI are not code-signed unless -SignCertThumbprint is given (see docs\INSTALLATION.md, "Signing").
 #>
 param(
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.1.0',
     [string]$SignCertThumbprint,
     [switch]$SkipTests
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $release = Join-Path $root 'release'
-$stage = Join-Path $root 'artifacts\publish'
-Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+$payload = Join-Path $root 'artifacts\payload'
+$msiDir = Join-Path $root 'installer\msi'
+Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue
 
 if (-not $SkipTests) {
     & (Join-Path $PSScriptRoot 'Test.ps1') -Configuration Release
@@ -25,44 +26,45 @@ if (-not $SkipTests) {
 
 function Publish($proj, $out) {
     & dotnet publish (Join-Path $root $proj) -c Release -r win-x64 --self-contained true -p:Platform=x64 `
-        -p:Version=$Version -p:DebugType=none -o $out -nologo
+        -p:Version=$Version -p:DebugType=none -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true -o $out -nologo
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $proj" }
 }
 
-function Sign($dir) {
+function Sign([string[]]$files) {
     if (-not $SignCertThumbprint) { return }
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
     if (-not $signtool) { throw 'signtool.exe not found (Windows SDK)' }
-    Get-ChildItem $dir -Include 'Nexora*.exe', 'Nexora*.dll', 'nexora.exe' -Recurse | ForEach-Object {
-        & $signtool.FullName sign /sha1 $SignCertThumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
-        if ($LASTEXITCODE -ne 0) { throw "Signing failed: $($_.Name)" }
+    foreach ($f in $files) {
+        & $signtool.FullName sign /sha1 $SignCertThumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $f
+        if ($LASTEXITCODE -ne 0) { throw "Signing failed: $f" }
     }
 }
 
-function Make-Package($name, $appProj, $files) {
-    $dir = Join-Path $release "NexoraPrinterLAN-$name-$Version-win-x64"
-    Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Force -Path "$dir\app" | Out-Null
-    Publish $appProj "$dir\app"
-    Publish 'src\Tools\Nexora.Cli\Nexora.Cli.csproj' "$stage\cli-$name"
-    Copy-Item "$stage\cli-$name\nexora.exe", "$stage\cli-$name\nexora.dll", "$stage\cli-$name\nexora.runtimeconfig.json", "$stage\cli-$name\nexora.deps.json" "$dir\app" -Force
-    foreach ($f in $files) { Copy-Item (Join-Path $root $f) $dir -Force }
-    Copy-Item (Join-Path $root 'docs\INSTALLATION.md'), (Join-Path $root 'docs\TROUBLESHOOTING.md'), (Join-Path $root 'LICENSE') $dir -Force
-    Sign "$dir\app"
-    $zip = "$dir.zip"
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    Compress-Archive -Path "$dir\*" -DestinationPath $zip
-    $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $(Split-Path $zip -Leaf)" | Add-Content (Join-Path $release 'SHA256SUMS.txt')
-    Write-Host "Created $zip" -ForegroundColor Green
+Publish 'src\App\Nexora.App\Nexora.App.csproj' "$payload\app"
+Publish 'src\Tools\Nexora.Cli\Nexora.Cli.csproj' "$payload\cli"
+foreach ($exe in "$payload\app\NexoraPrinterLAN.exe", "$payload\cli\nexora.exe") {
+    if (-not (Test-Path $exe)) { throw "Missing $exe after publish" }
 }
+$extra = Get-ChildItem "$payload\app" -File | Where-Object Name -notin 'NexoraPrinterLAN.exe', 'nexora.ico'
+if ($extra) { throw "Single-file publish left extra files the MSI does not install: $($extra.Name -join ', ')" }
+Sign @("$payload\app\NexoraPrinterLAN.exe", "$payload\cli\nexora.exe")
 
 New-Item -ItemType Directory -Force -Path $release | Out-Null
-Remove-Item (Join-Path $release 'SHA256SUMS.txt') -ErrorAction SilentlyContinue
-Make-Package 'Client' 'src\Client\Nexora.Client.App\Nexora.Client.App.csproj' @(
-    'installer\Install-NexoraClient.ps1', 'installer\Uninstall-NexoraClient.ps1', 'installer\Install-Client.cmd', 'installer\Common.ps1',
-    'scripts\Install-NexoraQueue.ps1', 'scripts\Uninstall-NexoraQueue.ps1', 'scripts\Diagnostics.ps1')
-Make-Package 'Receiver' 'src\Receiver\Nexora.Receiver.App\Nexora.Receiver.App.csproj' @(
-    'installer\Install-NexoraReceiver.ps1', 'installer\Uninstall-NexoraReceiver.ps1', 'installer\Install-Receiver.cmd', 'installer\Common.ps1',
-    'scripts\Diagnostics.ps1')
-Get-Content (Join-Path $release 'SHA256SUMS.txt')
+$msi = Join-Path $release "NexoraPrinterLAN-$Version-x64.msi"
+Push-Location $msiDir
+try {
+    & wix build NexoraPrinterLAN.wxs -arch x64 `
+        -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -ext WixToolset.Firewall.wixext `
+        -d Version=$Version -d PayloadDir=$payload -d AssetsDir="$root\assets" -d ScriptsDir="$root\scripts" `
+        -d DocsDir="$root\docs" -d RootDir=$root -o $msi
+    if ($LASTEXITCODE -ne 0) { throw "wix build failed ($LASTEXITCODE)" }
+}
+finally { Pop-Location }
+Remove-Item ([IO.Path]::ChangeExtension($msi, '.wixpdb')) -ErrorAction SilentlyContinue
+Sign @($msi)
+
+$hash = (Get-FileHash $msi -Algorithm SHA256).Hash.ToLowerInvariant()
+"$hash  $(Split-Path $msi -Leaf)" | Set-Content (Join-Path $release 'SHA256SUMS.txt')
+Write-Host "Created $msi ($([math]::Round((Get-Item $msi).Length / 1MB, 1)) MB)" -ForegroundColor Green
+Write-Host "SHA-256 $hash"

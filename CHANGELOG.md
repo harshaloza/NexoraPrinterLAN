@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.0 — 2026-11-06
+
+### Changed
+- **One app**: Nexora Client and Nexora Receiver are combined into `NexoraPrinterLAN.exe`. It shows the pages for
+  the roles installed on the PC (print to another PC, receive and print, or both), with one tray icon.
+- **One Setup**: a Windows Installer package (`NexoraPrinterLAN-<ver>-x64.msi`) replaces the PowerShell
+  installers. Custom Setup lets you choose the roles; Modify adds/removes roles; Uninstall removes the printer,
+  firewall rules, autostart and shortcuts (user data is kept); upgrades keep roles and settings.
+- Installing 1.1 over the 1.0.x apps removes them and keeps pairing, settings, history and the print queue.
+
+### Added
+- Receiver setting **Keep copies of printed jobs** (default off): the received PDF — only the transport format —
+  is deleted once Windows has sent the job to the printer. Test-mode jobs are always kept.
+
+### Removed
+- `installer\Install-Nexora{Client,Receiver}.ps1`, the `.cmd` launchers and per-app zip packages.
+
 ## 1.0.1 — 2026-11-05
 
 ### Fixed

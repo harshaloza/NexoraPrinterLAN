@@ -53,15 +53,15 @@ flowchart LR
 | `PrintPipeline/Nexora.PrintPipeline` | Client-side capture: named-pipe server with restricted ACL, job-ticket read from the spooler at connect time, restart of jobs that stalled while the client was not running, queue inspector. |
 | `PrinterIntegration/Nexora.PrinterIntegration` | Receiver-side printing: printer catalog with real spooler status, PDF rendering with Windows' built-in engine, printing through the destination driver, spool-job tracking. |
 | `Client/Nexora.Client.Core` | Client engine: outbox, sender with resume and exponential backoff, discovery/IP-change handling, status polling. |
-| `Client/Nexora.Client.App` | WPF tray app `NexoraClient.exe` (Dashboard, Printers, Devices, Print jobs, Settings). |
 | `Receiver/Nexora.Receiver.Core` | Receiver host: TCP server, job store, print queue, discovery responder, retention. |
-| `Receiver/Nexora.Receiver.App` | WPF tray app `NexoraReceiver.exe` (Dashboard + pairing code, Received jobs, Printers, Settings). |
+| `App/Nexora.App` | The single WPF tray app `NexoraPrinterLAN.exe`. Shows client pages (Print jobs, Devices, Nexora printer), receiver pages (Received jobs, Printers on this PC) or both, according to the roles Setup recorded in `HKLM\SOFTWARE\Nexora\PrinterLAN`. |
 | `UI/Nexora.UI` | Shared WPF theme, MVVM helpers, tray icon, autostart, snapshot renderer. |
 | `Tools/Nexora.Cli` | `nexora.exe` — headless receiver/client, discovery, send, status, printers, queue, PDF info, local print test. |
 
 ## 4. Process model
 
-Both apps run **in the signed-in user's desktop session** (started at sign-in), not as Windows services:
+`NexoraPrinterLAN.exe` hosts the client engine and/or the receiver host in one process and runs **in the
+signed-in user's desktop session** (started at sign-in by Setup's all-users autostart entry), not as a Windows service:
 
 * Microsoft does not support `System.Drawing.Printing`/GDI printing from services; the receiver must print in a
   user session to drive vendor drivers such as Canon CAPT reliably.
@@ -108,8 +108,10 @@ Receiver: RECEIVED (bytes on disk, SHA-256 matches) → VALIDATED (PDF structure
 * **Windows.Data.Pdf** (inbox WinRT PDF engine) for rendering on the receiver — no third-party PDF library.
 * **System.Text.Json** with typed records only (no polymorphic type handling) for config, metadata and protocol.
 * **xUnit** for unit and integration tests.
-* **PowerShell** installers (WiX 4 is available on the dev PC but the printer/firewall steps are clearer and
-  auditable as scripts; see `INSTALLATION.md`).
+* **Windows Installer (WiX 4)** Setup with features per role, firewall rules from the WiX Firewall extension,
+  and the queue created/removed by the audited PowerShell queue scripts run as deferred SYSTEM custom actions
+  (see `installer/msi/NexoraPrinterLAN.wxs`, `INSTALLATION.md`). The app and CLI are self-contained single-file
+  executables.
 * Python is no longer used; the earlier prototypes are kept in `legacy/`.
 
 ## 8. Risks and uncertain platform behaviour
@@ -126,5 +128,20 @@ Receiver: RECEIVED (bytes on disk, SHA-256 matches) → VALIDATED (PDF structure
 
 * IPP Everywhere endpoint on the receiver (`application/pdf`) for Windows Protected Print Mode compatibility.
 * Windows service for receipt/storage on PC2 with a per-session print agent, so jobs are accepted while nobody is signed in.
-* Signed custom v4 driver only if arbitrary custom paper sizes become a hard requirement.
-* MSI packaging (WiX) once the PowerShell installers are validated on both PCs.
+* Signed custom v4 driver only if arbitrary custom paper sizes become a hard requirement (see §10).
+* Vector print path on the receiver (draw PDF pages as vectors instead of 600-dpi bitmaps).
+
+## 10. Could Nexora have its own printer driver?
+
+Technically yes — a v4 print driver package (GPD/XPSDrv) named "Nexora" with any paper sizes (A0/A1 for CAD) and
+its own options. It is not done because:
+
+* Windows only installs **signed** driver packages: an EV code-signing certificate, a Microsoft Partner Center
+  hardware account and attestation (or HLK/WHQL) signing for every release. Test-signing is not acceptable here.
+* Microsoft's *End of servicing plan for third-party printer drivers* (announced September 2023; Microsoft's page
+  lists 2026 for preferring the inbox IPP class driver and 2027 for stopping third-party driver updates except
+  security fixes) moves Windows printing to the inbox **IPP class driver** plus **Print Support Apps**.
+* The inbox driver already covers the printing need; only paper sizes beyond its list are limited.
+
+The future-proof way to a branded "own printer" is therefore an IPP endpoint (Microsoft IPP Class Driver, no
+driver package) with an optional Print Support App for custom options — see §9.
