@@ -1,11 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>Nexora.Client.App</RootNamespace>
-    <AssemblyName>NexoraClient</AssemblyName>
+    <RootNamespace>Nexora.App</RootNamespace>
+    <AssemblyName>NexoraPrinterLAN</AssemblyName>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>..\..\..\assets\nexora-client.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\..\assets\nexora.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
@@ -13,11 +13,12 @@
     <Using Include="System.IO" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Nexora.Client.Core\Nexora.Client.Core.csproj" />
+    <ProjectReference Include="..\..\Client\Nexora.Client.Core\Nexora.Client.Core.csproj" />
+    <ProjectReference Include="..\..\Receiver\Nexora.Receiver.Core\Nexora.Receiver.Core.csproj" />
     <ProjectReference Include="..\..\UI\Nexora.UI\Nexora.UI.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\assets\nexora-client.ico" Link="nexora-client.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\assets\nexora.ico" Link="nexora.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\scripts\Install-NexoraQueue.ps1" Link="scripts\Install-NexoraQueue.ps1" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\scripts\Uninstall-NexoraQueue.ps1" Link="scripts\Uninstall-NexoraQueue.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

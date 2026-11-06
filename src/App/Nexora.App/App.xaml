@@ -1,4 +1,4 @@
-<Application x:Class="Nexora.Receiver.App.App"
+<Application x:Class="Nexora.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
@@ -6,6 +6,8 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Nexora.UI;component/Theme.xaml"/>
+                <ResourceDictionary Source="Client/ClientPages.xaml"/>
+                <ResourceDictionary Source="Receiver/ReceiverPages.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

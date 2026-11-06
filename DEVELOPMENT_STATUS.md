@@ -1,49 +1,45 @@
 # DEVELOPMENT_STATUS — Nexora Printer LAN
 
-_Last updated: 2026-11-05. Resume from "Exact next action"._
+_Last updated: 2026-11-06 (version 1.1.0, branch `feature/v1.1-combined-app`). Resume from "Exact next action"._
 
 ## Completed
 
 | Phase | State |
 |---|---|
-| 1 Repository & architecture | Done. Prototypes moved to `legacy/`. Architecture chosen and documented (`docs/ARCHITECTURE.md`): inbox *Microsoft Print To PDF* driver + named-pipe Local Port + user-mode .NET apps. |
-| 2 LAN receiver & transport | Done. NXP/2 (pairing-code auth, AES-GCM, resumable chunks, SHA-256 from disk, duplicates, states) + NexoraDiscovery/2. Tested on loopback. |
-| 3 Windows print pipeline | Done on PC1. Queue installed (approved). Captures Notepad, Word, Excel, Out-Printer, GDI apps. NX/AutoCAD/SolidWorks untested. |
-| 4 Receiver print integration | Implemented (Windows.Data.Pdf → GDI through destination driver, paper/orientation matching, copies, colour, spooler tracking). Verified with *Microsoft Print to PDF*. **Canon LBP2900 untested (disconnected).** |
-| 5 GUI & integration | Done. WPF tray apps NexoraClient.exe / NexoraReceiver.exe, `nexora.exe` CLI. |
-| 6 Installation & packaging | Done: `scripts/Package.ps1` → `release/*.zip` (self-contained). PowerShell installers/uninstallers with firewall scoping and rollback. **Client installer run successfully on PC1**; receiver installer, rollback and uninstall not yet executed. |
-| 7 Verification | `docs/TEST_REPORT.md`. 63/63 unit, 19/19 integration passing. Cross-PC and hardware tests pending. |
+| 1 Repository & architecture | Done. Inbox *Microsoft Print To PDF* driver + named-pipe Local Port + user-mode .NET app (`docs/ARCHITECTURE.md`; §10 explains why there is no custom driver). |
+| 2 LAN receiver & transport | Done. NXP/2 (pairing-code auth, AES-GCM, resumable chunks, SHA-256 from disk, duplicates, states) + NexoraDiscovery/2. |
+| 3 Windows print pipeline | Done. Captures Notepad, Word, Excel, Out-Printer, GDI apps. NX/AutoCAD/SolidWorks untested. |
+| 4 Receiver print integration | Done. Windows.Data.Pdf → GDI through the destination driver. **Canon LBP2900: one page printed correctly (2026-11-05, user-confirmed).** 1.1: received PDF deleted after printing unless *Keep copies of printed jobs*. |
+| 5 GUI | 1.1: one tray app `NexoraPrinterLAN.exe` showing client and/or receiver pages by installed role; `nexora.exe` CLI. |
+| 6 Installation | 1.1: one WiX MSI `release/NexoraPrinterLAN-1.1.0-x64.msi` with roles, Modify, Uninstall, upgrade from 1.0.x. Tested on PC1: upgrade from 1.0.1, add/remove Receiver role, uninstall, reinstall, same-version upgrade. |
+| 7 Verification | `docs/TEST_REPORT.md`: 63/63 unit, 21/21 integration; cross-PC + Canon (1.0.1); Setup lifecycle (1.1.0, PC1). |
 
-## Environment facts discovered
+## Current state of the PCs
 
-* PC1's actual IP is **192.168.0.43** (not .140): DHCP. The design relies on discovery, not fixed IPs.
-* PC1's Wi-Fi profile is **Public**. Fine for the client (no inbound rules). PC2 must be **Private** for receiver rules.
-* .NET SDK 9.0.320 / runtimes 8 + 9 installed; target is net8.0 (EOL 10 Nov 2026) → retarget to .NET 10 when its SDK is installed (`NexoraTfm` in `Directory.Build.props`).
-* Python, C++/WDK are not used by the product.
+* **PC1** (`HARSHALOZA`, 192.168.1.14, Wi-Fi "KHODAL 5G", Public profile): Nexora Printer LAN **1.1.0** installed
+  from the MSI (Client role), running, paired with `PROGRAMMING`. The installed build predates one last change that
+  only affects `--snapshot` mode; the MSI in `release/` is the final build.
+* **PC2** (`PROGRAMMING`, 192.168.1.3): still the **1.0.0 Receiver**, in **print mode** with the Canon LBP2900.
+  Any job sent from PC1 prints on paper. PC2 did not answer discovery on 2026-11-06.
 
-## Build results
+## Environment facts
 
-`scripts\Build.ps1` — 0 errors, 0 warnings (Debug and Release, x64). `scripts\Package.ps1` — both packages created.
-
-## Cross-PC result (2026-11-05)
-
-PC1 (192.168.1.14) → receiver `PROGRAMMING` (192.168.1.3) on Wi-Fi "KHODAL 5G": discovery, pairing, auto-select and
-delivery of a held job → VALIDATED, saved in test mode on PC2. Both PCs are now on 192.168.1.0/24, not the 192.168.0.x
-addresses in the original brief. 1.0.1 (retry immediately when pairing/receiver settings change) built and installed on PC1 as an upgrade; 1.0.0 kept
-as rollback. PC2 is now in **print mode with Canon LBP2900**: an 11:00 upgrade-check page reached COMPLETED in PC2's
-spooler and **the user confirmed it printed correctly** — first end-to-end physical print (one portrait text page). PC2 still runs Receiver 1.0.0 (unchanged; the fix is client-only).
+* Both PCs moved from 192.168.0.x (original brief) to 192.168.1.0/24; discovery handles it.
+* .NET target net8.0 (support ends 10 Nov 2026) → retarget to .NET 10 when its SDK is installed (`NexoraTfm` in `Directory.Build.props`).
+* Packaging needs the WiX 4.0.5 dotnet tool and its UI/Util/Firewall extensions in `installer/msi/.wix` (git-ignored; see INSTALLATION §10).
+* Leftover from 1.0.0 testing on PC1: Windows-generated firewall rules **NexoraReceiver** (Allow, Public, for a deleted
+  release-folder exe). Remove as Administrator: `Remove-NetFirewallRule -DisplayName 'NexoraReceiver'`.
 
 ## Remaining tasks
 
-1. ~~Install receiver on PC2, pair, first cross-PC delivery~~ — done 2026-11-05.
-2. Send real documents PC1 → PC2 (Word, Excel, a multi-page/large PDF) and open them on PC2; update TEST_REPORT.
-3. Test printing from Siemens NX 12 (and AutoCAD/SolidWorks where available).
-4. ~~Canon LBP2900 first physical print~~ — done 2026-11-05 (one page). Extend: multi-page, landscape, copies, drawings, offline/reconnect.
-5. Exercise installer upgrade/rollback/uninstall on both PCs.
-6. Retarget to .NET 10 LTS.
-7. Optional: IPP endpoint (WPP), receiver service mode, MSI packaging, code signing.
+1. PC2: install `NexoraPrinterLAN-1.1.0-x64.msi` (it pre-selects *Receive and print* and removes the 1.0.0 Receiver,
+   keeping pairing and settings). Check the app shows the receiver pages and the Canon as destination.
+2. Send a multi-page Word document (2 copies) and an NX 12 drawing (landscape) PC1 → PC2; check the Canon output
+   (page order, copies, orientation, scaling) and that the received PDF is removed after printing.
+3. Exercise the interactive Setup wizard once (Custom Setup page) — automated tests used `/qb`.
+4. Retarget to .NET 10 LTS; code-sign the MSI (optional, removes SmartScreen warning).
+5. Optional: vector print path on the receiver; IPP endpoint for Windows Protected Print Mode; receiver service mode.
 
 ## Exact next action
 
-On PC1, print a multi-page Word document (2 copies) and an NX 12 drawing (landscape) to **Nexora Printer LAN**; check
-the Canon output on PC2 for page order, copies, orientation and scaling; record results in TEST_REPORT.
+Copy `release\NexoraPrinterLAN-1.1.0-x64.msi` to PC2 and run it (keep *Receive and print on this PC* selected).

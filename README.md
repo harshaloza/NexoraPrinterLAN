@@ -4,32 +4,35 @@ Print from any Windows application on one PC to a printer attached to another PC
 Choose **Nexora Printer LAN** in the normal print dialog, click Print, and the job is sent automatically, encrypted,
 to the receiver PC, which saves it (test mode) or prints it through the printer's own Windows driver.
 
-![Client dashboard](docs/images/client-dashboard.png)
+![Dashboard](docs/images/app-dashboard.png)
 
 ## How it works
 
 ```
 App ─print→ Windows queue "Nexora Printer LAN" (inbox Microsoft Print To PDF driver)
-    ─Local Port \\.\pipe\NexoraPrinterLAN→ Nexora Client (PC1) ─TCP 9102, AES-256-GCM→ Nexora Receiver (PC2)
+    ─Local Port \\.\pipe\NexoraPrinterLAN→ Nexora Printer LAN on PC1 ─TCP 9102, AES-256-GCM→ Nexora Printer LAN on PC2
     ─Windows.Data.Pdf + GDI→ destination printer driver (e.g. Canon CAPT) → paper
 ```
 
-No custom driver, port monitor or kernel component is installed. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+One app, `NexoraPrinterLAN.exe`, does both jobs: on each PC Setup installs the role(s) it needs — *Print to another
+PC* and/or *Receive and print on this PC*. The PDF is only the hidden transport format; the receiver deletes it
+after printing unless *Keep copies of printed jobs* is on. No custom driver, port monitor or kernel component is
+installed. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Status
 
-Version 1.0.1. Verified: queue creation and capture from Notepad, Word, Excel and GDI apps; encrypted, resumable
-transfer; client install and upgrade; **PC1 → PC2 over Wi-Fi with automatic discovery**; and a **physical page
-printed on the Canon LBP2900** through its CAPT driver (one portrait text page).
-**Not yet verified:** multi-page/landscape/copies on the Canon, CAD applications (NX, AutoCAD, SolidWorks). See
-[docs/TEST_REPORT.md](docs/TEST_REPORT.md) and [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
+Version 1.1.0. Verified: queue creation and capture from Notepad, Word, Excel and GDI apps; encrypted, resumable
+transfer; **PC1 → PC2 over Wi-Fi with automatic discovery** and a **physical page on the Canon LBP2900** (1.0.1);
+the combined app; Setup install, upgrade from 1.0.x, role add/remove, uninstall and reinstall on PC1.
+**Not yet verified:** 1.1.0 on PC2, multi-page/landscape/copies on the Canon, CAD applications (NX, AutoCAD,
+SolidWorks). See [docs/TEST_REPORT.md](docs/TEST_REPORT.md) and [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## Quick start
 
-1. Build the packages: `.\scripts\Package.ps1` → `release\NexoraPrinterLAN-{Client,Receiver}-1.0.0-win-x64.zip`.
-2. **PC2** (printer PC): extract the Receiver zip, run `Install-Receiver.cmd`, note the pairing code.
-3. **PC1** (printing PC): extract the Client zip, run `Install-Client.cmd`, enter the pairing code in Settings.
-4. Print to **Nexora Printer LAN** from any application.
+1. Build Setup: `.\scripts\Package.ps1` → `release\NexoraPrinterLAN-1.1.0-x64.msi`.
+2. **PC2** (printer PC): run the MSI, choose **Receive and print on this PC**, note the pairing code.
+3. **PC1** (printing PC): run the same MSI (default **Print to another PC**), enter the pairing code in Settings.
+4. Print to **Nexora Printer LAN** from any application. Uninstall from Apps & features.
 
 Full instructions: [docs/INSTALLATION.md](docs/INSTALLATION.md) · Problems: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
@@ -41,12 +44,13 @@ Full instructions: [docs/INSTALLATION.md](docs/INSTALLATION.md) · Problems: [do
 | `src/Transport`, `src/Discovery` | NXP/2 protocol and LAN discovery ([docs/NETWORK_PROTOCOL.md](docs/NETWORK_PROTOCOL.md)) |
 | `src/PrintPipeline` | Client-side job capture from the Windows queue |
 | `src/PrinterIntegration` | Receiver-side printing through installed drivers |
-| `src/Client`, `src/Receiver` | Engines (`*.Core`) and WPF apps (`*.App`) |
+| `src/Client`, `src/Receiver` | Client and receiver engines (`*.Core`) |
+| `src/App` | The combined WPF tray app `NexoraPrinterLAN.exe` |
 | `src/UI` | Shared WPF theme and desktop helpers |
 | `src/Tools/Nexora.Cli` | `nexora.exe` diagnostics / headless tool |
 | `tests/Unit`, `tests/Integration` | xUnit tests (`scripts\Test.ps1`) |
 | `scripts/` | Build, Test, Package, Diagnostics, queue install/uninstall, icon generator |
-| `installer/` | Client and Receiver installers / uninstallers |
+| `installer/msi` | WiX 4 Setup (roles, firewall, queue, upgrade from 1.0.x, uninstall) |
 | `docs/` | Architecture, installation, protocol, security, troubleshooting, test report, screenshots |
 | `legacy/` | Earlier Python prototypes (not used) |
 

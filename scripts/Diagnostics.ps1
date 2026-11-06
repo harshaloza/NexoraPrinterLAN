@@ -40,21 +40,24 @@ if ($q) {
     $jobs = Get-PrintJob -PrinterName 'Nexora Printer LAN' -ErrorAction SilentlyContinue
     if ($jobs) { Warn "$($jobs.Count) job(s) waiting in the Windows queue: $(($jobs | ForEach-Object { "$($_.DocumentName) [$($_.JobStatus)]" }) -join '; ')" }
 } else { Write-Host '  Queue not installed (normal on the receiver PC)' }
-if (Get-Process NexoraClient -ErrorAction SilentlyContinue) { Ok 'NexoraClient.exe running' } elseif ($q) { Warn 'NexoraClient.exe is not running - printed jobs will wait in the Windows queue' }
+$roles = Get-ItemProperty 'HKLM:\SOFTWARE\Nexora\PrinterLAN' -ErrorAction SilentlyContinue
+if ($roles) { Write-Host "  installed roles: client=$($roles.Client -eq 1) receiver=$($roles.Receiver -eq 1)" }
+if (Get-Process NexoraPrinterLAN -ErrorAction SilentlyContinue) { Ok 'NexoraPrinterLAN.exe running' } elseif ($q) { Warn 'NexoraPrinterLAN.exe is not running - printed jobs will wait in the Windows queue' }
+if (Get-Process NexoraClient, NexoraReceiver -ErrorAction SilentlyContinue) { Warn 'An old 1.0.x NexoraClient/NexoraReceiver is running - install Nexora Printer LAN 1.1 Setup to replace it' }
 if (Test-Path '\\.\pipe\NexoraPrinterLAN') { Ok 'Capture pipe \\.\pipe\NexoraPrinterLAN is open' } elseif ($q) { Warn 'Capture pipe is not open' }
 
 Section 'Nexora Receiver (this PC has the printer)'
-$rx = Get-Process NexoraReceiver -ErrorAction SilentlyContinue
-if ($rx) { Ok 'NexoraReceiver.exe running' } else { Write-Host '  NexoraReceiver.exe not running (normal on the client PC)' }
+$rx = $roles -and $roles.Receiver -eq 1
+if (-not $rx) { Write-Host '  Receiver role not installed (normal on the client PC)' }
 foreach ($ep in Get-NetTCPConnection -State Listen -LocalPort $TcpPort -ErrorAction SilentlyContinue) {
     $proc = (Get-Process -Id $ep.OwningProcess -ErrorAction SilentlyContinue).ProcessName
-    if ($proc -eq 'NexoraReceiver' -or $proc -eq 'nexora') { Ok "TCP $TcpPort listening ($proc)" } else { Warn "TCP $TcpPort is held by '$proc' (PID $($ep.OwningProcess)) - an old test receiver?" }
+    if ($proc -in 'NexoraPrinterLAN', 'NexoraReceiver', 'nexora') { Ok "TCP $TcpPort listening ($proc)" } else { Warn "TCP $TcpPort is held by '$proc' (PID $($ep.OwningProcess)) - an old test receiver?" }
 }
 foreach ($ep in Get-NetUDPEndpoint -LocalPort $UdpPort -ErrorAction SilentlyContinue) {
     $proc = (Get-Process -Id $ep.OwningProcess -ErrorAction SilentlyContinue).ProcessName
-    if ($proc -eq 'NexoraReceiver' -or $proc -eq 'nexora') { Ok "UDP $UdpPort bound ($proc)" } else { Warn "UDP $UdpPort is held by '$proc' (PID $($ep.OwningProcess)) - stop the Phase 1 receiver.py" }
+    if ($proc -in 'NexoraPrinterLAN', 'NexoraReceiver', 'nexora') { Ok "UDP $UdpPort bound ($proc)" } else { Warn "UDP $UdpPort is held by '$proc' (PID $($ep.OwningProcess)) - stop the Phase 1 receiver.py" }
 }
-$rules = Get-NetFirewallRule -Group 'Nexora Printer LAN' -ErrorAction SilentlyContinue
+$rules = Get-NetFirewallRule -PolicyStore ActiveStore -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Nexora Printer LAN*' -or $_.Group -eq 'Nexora Printer LAN' }
 if ($rules) {
     foreach ($r in $rules) {
         $addr = ($r | Get-NetFirewallAddressFilter).RemoteAddress -join ','
@@ -72,7 +75,7 @@ if ($Receiver) {
     if ($t.TcpTestSucceeded) { Ok "TCP $TcpPort reachable" } else { Bad "TCP $TcpPort NOT reachable: receiver not running, firewall, or Public network profile on the receiver" }
 }
 
-$cli = @((Join-Path $PSScriptRoot 'app\nexora.exe'), (Join-Path $PSScriptRoot 'nexora.exe')) | Where-Object { Test-Path $_ } | Select-Object -First 1
+$cli = @((Join-Path $PSScriptRoot '..\nexora.exe'), (Join-Path $PSScriptRoot 'nexora.exe')) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if ($cli) {
     Section 'Discovery (UDP broadcast)'
     & $cli discover --seconds 3

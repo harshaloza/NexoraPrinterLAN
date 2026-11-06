@@ -1,5 +1,30 @@
 # Nexora Printer LAN — Test report
 
+## Version 1.1.0 (2026-11-06, PC1 192.168.1.14)
+
+Automated: `scripts\Test.ps1` → **63/63 unit, 21/21 integration passed** (Release). The real-queue capture test
+self-skipped while the installed app held the pipe; with the app stopped it was run on its own and **passed**.
+
+| Test | Result |
+|---|---|
+| Combined app `NexoraPrinterLAN.exe` renders all pages for both roles (snapshots in `docs/images/app-*.png`) | Passed |
+| Single-file self-contained app and CLI run, including the Windows PDF engine | Passed |
+| **Keep copies of printed jobs** — off: PDF deleted after COMPLETED, buttons disabled; on: PDF kept (integration test printing through *Microsoft Print to PDF* into a file) | Passed |
+| MSI install over the 1.0.1 PowerShell install (`/qb`): old NexoraClient stopped and removed (folder, autostart, Apps & features entry), Client role pre-selected, queue kept, pairing/receiver/settings kept, new app captures on the pipe | Passed |
+| Modify → add *Receive and print*: rules "Nexora Printer LAN - print jobs (TCP-In)" TCP 9102 and "… discovery (UDP-In)" UDP 9101, Allow, **Private**, **LocalSubnet**, program = `NexoraPrinterLAN.exe` (verified with `netsh`) | Passed |
+| Modify → remove *Receive and print*: firewall rules removed, Client role and queue untouched | Passed |
+| Uninstall: files, queue, port, autostart, Start menu, Apps & features entry removed; `%LOCALAPPDATA%\Nexora` kept | Passed |
+| Reinstall after uninstall: queue recreated, app starts and captures | Passed |
+| MSI upgrade (final 1.1.0 build over the earlier 1.1.0 test build): previous product removed, one entry left in Apps & features, Client role and queue kept, app starts and captures | Passed |
+| Not tested in 1.1.0 | PC2 install/upgrade from 1.0.x Receiver (PC2 was not reachable on 2026-11-06); interactive Setup UI clicks (tests used `/qb`); a real print through the combined app to PC2 (PC2 is in print mode: real paper). |
+
+Found during testing (not caused by Setup): two Windows-generated firewall rules named **NexoraReceiver** allow
+`D:\NexoraPrinterLAN\release\nexoraprinterlan-receiver-1.0.0-win-x64\app\nexorareceiver.exe` inbound on the
+**Public** profile. They come from a firewall prompt answered during the 1.0.0 packaging smoke test. Removal command
+in DEVELOPMENT_STATUS.md.
+
+## Version 1.0.x
+
 **Build:** 1.0.0 · **Date:** 2026-11-05 · **Tested on:** PC1 only (Windows 11 Pro build 26300, x64, Wi-Fi 192.168.0.43, network profile *Public*)
 **Cross-PC (2026-11-05, Wi-Fi "KHODAL 5G", 192.168.1.0/24):** PC1 = 192.168.1.14 (client installed), PC2 = receiver
 **`PROGRAMMING`** at 192.168.1.3 (installed by the user). Both PCs had moved off the 192.168.0.x addresses in the

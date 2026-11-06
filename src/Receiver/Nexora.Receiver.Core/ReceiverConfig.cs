@@ -20,6 +20,8 @@ public sealed class ReceiverConfig
     public bool TestMode { get; set; } = true;
     public string? DestinationPrinter { get; set; }
     public PrintScaling Scaling { get; set; } = PrintScaling.FitToPrintableArea;
+    /// <summary>Keep the received PDF after it was printed. Off by default: the PDF is only the transport format.</summary>
+    public bool KeepPrintedCopies { get; set; }
     /// <summary>Upper bound on rendering resolution. The printer's own resolution is used when lower.</summary>
     public int MaxRenderDpi { get; set; } = 600;
 

@@ -1,119 +1,113 @@
 # Nexora Printer LAN — Installation
 
-Two packages are produced by `scripts\Package.ps1` (folder + `.zip` in `release\`):
+One Setup file serves both PCs: **`NexoraPrinterLAN-<version>-x64.msi`** (built by `scripts\Package.ps1` into `release\`).
+During Setup you choose what each PC does:
 
-| Package | Install on | Contains |
+| Role (Setup feature) | Choose it on | What it adds |
 |---|---|---|
-| `NexoraPrinterLAN-Client-<ver>-win-x64` | **PC1** — the PC you print from (192.168.0.43 at the time of writing; its address may change) | `NexoraClient.exe`, `nexora.exe`, queue scripts, installer |
-| `NexoraPrinterLAN-Receiver-<ver>-win-x64` | **PC2** — the PC with the printer (`HarshalOza-PC`, 192.168.0.31 last known) | `NexoraReceiver.exe`, `nexora.exe`, installer |
+| **Print to another PC** | the PC you print from (PC1) | the printer **Nexora Printer LAN** (Windows' own *Microsoft Print To PDF* driver + local port `\\.\pipe\NexoraPrinterLAN`) |
+| **Receive and print on this PC** | the PC with the physical printer (PC2) | inbound firewall rules TCP 9102 / UDP 9101 — Private networks, local subnet, `NexoraPrinterLAN.exe` only |
 
-Requirements: Windows 10 2004 (build 19041) or newer, x64, administrator approval for installation. .NET is
-**not** required (packages are self-contained). The client also needs the Windows feature *Microsoft Print to PDF*
-(enabled by default on Windows 10/11).
+A PC can have both roles. Requirements: Windows 10 2004 (build 19041) or newer, x64, administrator approval.
+.NET is **not** required (the app is self-contained). No printer driver, port monitor or service is installed.
 
-## 0. Before you start (PC2)
+## 1. Install on the printer PC (PC2) first
 
-The prototypes from `legacy\` bind the same ports. Stop any running `receiver.py` / `test_receiver.py` window
-(Ctrl+C) on PC2 first.
+1. Copy the `.msi` to PC2 and double-click it.
+2. *Welcome → License → Custom Setup*: open the drop-down next to **Receive and print on this PC** and choose
+   *Will be installed on local hard drive*. Set **Print to another PC** to *Entire feature will be unavailable*
+   (unless PC2 should also print to another PC). *Next → Install*, approve UAC, keep **Start Nexora Printer LAN now** ticked.
+3. Nexora Printer LAN shows the **pairing code**. The receiver starts in **test mode** (documents are saved,
+   not printed).
+4. If PC2's network is marked **Public**, the firewall rules do not apply. On a trusted LAN change it to Private:
+   *Settings → Network & internet → Wi-Fi (or Ethernet) → your network → Network profile type → Private*.
 
-## 1. Install the receiver — on PC2
+Command line (PowerShell as Administrator on PC2):
+```powershell
+msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Receiver /qb
+```
 
-1. Copy `NexoraPrinterLAN-Receiver-1.0.0-win-x64.zip` to PC2, right-click → *Extract All*.
-2. Double-click **`Install-Receiver.cmd`** and approve the UAC prompt.
-   Equivalent command (PowerShell **as Administrator** on PC2, in the extracted folder):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\Install-NexoraReceiver.ps1
-   ```
-   To allow only PC1, scope the firewall to PC1's address or your subnet:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\Install-NexoraReceiver.ps1 -RemoteAddress 192.168.0.0/24
-   ```
-3. Nexora Receiver opens and shows the **pairing code**. It starts in **test mode** (documents are saved to
-   `%LOCALAPPDATA%\Nexora\Receiver\received_jobs`, not printed).
-4. If the installer reports that the network is **Public**, the firewall rules do not apply. On a trusted LAN,
-   change it to Private: *Settings → Network & internet → Wi-Fi (or Ethernet) → your network → Network profile
-   type → Private*. Or, PowerShell as Administrator on PC2:
-   ```powershell
-   Get-NetConnectionProfile
-   Set-NetConnectionProfile -InterfaceAlias 'Wi-Fi' -NetworkCategory Private
-   ```
+## 2. Install on the PC you print from (PC1)
 
-## 2. Install the client — on PC1
+1. Run the same `.msi`; the default selection (**Print to another PC**) is right. Install, approve UAC.
+2. In Nexora Printer LAN → **Settings → Printing to another PC → Pairing code**, type the code from PC2 and click
+   *Save pairing code*.
+3. **Devices** → the PC2 receiver appears as *Paired* and is selected automatically. If discovery is blocked, set
+   *Manual receiver address* to PC2's IP or name.
+4. **Dashboard → Send test page.** It should reach *Validated* (test mode) on PC2.
 
-1. Extract `NexoraPrinterLAN-Client-1.0.0-win-x64.zip` on PC1.
-2. Double-click **`Install-Client.cmd`** and approve UAC. Equivalent (PowerShell as Administrator on PC1):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\Install-NexoraClient.ps1
-   ```
-   This creates the printer **Nexora Printer LAN** (Settings → Bluetooth & devices → Printers & scanners) using
-   the inbox *Microsoft Print To PDF* driver and port `\\.\pipe\NexoraPrinterLAN`, with A4 as default paper
-   (`-PaperSize Letter` to change).
-3. In Nexora Client → **Settings → Security**, type the pairing code from PC2 and click *Save pairing code*.
-4. **Devices** → *Discover*. PC2 should appear as *Paired*. With exactly one paired receiver it is selected
-   automatically. If discovery is blocked, enter `192.168.0.31` (or `HarshalOza-PC`) as *Manual receiver address*.
-5. **Dashboard** → *Send test page*. The job should reach **Validated** and the PDF appear on PC2.
+Command line (PowerShell as Administrator on PC1):
+```powershell
+msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Client /qb
+```
 
-## 3. Print a real document (PC1)
+## 3. Print
 
-Print from any application, choose **Nexora Printer LAN**, click Print. The job shows in *Print jobs*
-(PC1) and *Received jobs* (PC2).
+From any application choose **Nexora Printer LAN** → Print. Jobs appear under *Print jobs* (PC1) and *Received
+jobs* (PC2).
 
-## 4. Switch PC2 to real printing (when the Canon LBP2900 is connected)
+## 4. Start real printing on PC2
 
-1. Install Canon's **CAPT driver** for the LBP2900 on PC2 and print a Windows test page from *Printers & scanners*
-   to confirm the printer itself works. Nexora never modifies the Canon driver.
-2. Nexora Receiver → **Printers** → select *Canon LBP2900* → *Use as destination* → *Print test page*.
+1. Install the printer's own Windows driver (Canon LBP2900: Canon **CAPT** driver) and print a Windows test page
+   from *Printers & scanners*. Nexora never modifies the printer driver.
+2. Nexora Printer LAN → **Printers on this PC** → select the printer → *Use as destination* → *Print test page*.
 3. Dashboard → **Test mode OFF (print)**.
-4. From PC1, print a one-page document and confirm paper comes out. Only then record the Canon test as passed
-   in `docs/TEST_REPORT.md`.
+4. By default the received PDF is deleted once Windows has sent the job to the printer. To keep copies:
+   Settings → *Keep copies of printed jobs*.
 
-## 5. Command-line checks
+## 5. Change roles later (Modify)
 
-PC1 or PC2 (in the extracted package folder):
+*Settings → Apps → Installed apps → Nexora Printer LAN → ⋯ → Modify* (or run the `.msi` again → *Change*), then
+pick the roles. Or, as Administrator:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Diagnostics.ps1                       # read-only health check
-powershell -ExecutionPolicy Bypass -File .\Diagnostics.ps1 -Receiver 192.168.0.31 # PC1: also test TCP 9102
-.\app\nexora.exe discover --key XXXX-XXXX-XXXX-XXXX-XXXX                         # PC1: list receivers, "PAIRED"
-.\app\nexora.exe testpdf test.pdf; .\app\nexora.exe send test.pdf --key XXXX-XXXX-XXXX-XXXX-XXXX --to 192.168.0.31
-.\app\nexora.exe printers                                                        # PC2: printers + real status
+msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Receiver /qb    # add a role
+msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi REMOVE=Receiver /qb      # remove a role
 ```
+Restart Nexora Printer LAN (tray → Exit, then start it) after changing roles.
 
-## 6. Upgrade and rollback
+## 6. Upgrade
 
-Run the new package's installer over the old one. The previous program folder is kept as
-`C:\Program Files\Nexora Printer LAN\<Client|Receiver>.previous`; settings, pairing codes, outbox and received
-documents (in `%LOCALAPPDATA%\Nexora`) are untouched. To go back (as Administrator, from the package folder):
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Install-NexoraClient.ps1 -Rollback     # PC1
-powershell -ExecutionPolicy Bypass -File .\Install-NexoraReceiver.ps1 -Rollback   # PC2
-```
+Run the newer `.msi`. Setup closes the running app, replaces it, and keeps the installed roles, settings, pairing
+codes and job history (`%LOCALAPPDATA%\Nexora`). Installing 1.1 over the separate **Nexora Client / Nexora
+Receiver 1.0.x** apps removes those (program folders, autostart, Apps & features entries, old firewall rules),
+pre-selects the matching roles and keeps the print queue and all data.
+
+Downgrades are refused. To go back to an older version, uninstall and install the older `.msi`.
 
 ## 7. Uninstall
 
-*Settings → Apps → Installed apps → Nexora Printer LAN Client / Receiver → Uninstall*, or as Administrator:
+*Settings → Apps → Installed apps → Nexora Printer LAN → Uninstall*, Start menu → **Uninstall Nexora Printer LAN**,
+or as Administrator:
 ```powershell
-& 'C:\Program Files\Nexora Printer LAN\Client\Uninstall-NexoraClient.ps1'          # PC1 (removes queue + port)
-& 'C:\Program Files\Nexora Printer LAN\Receiver\Uninstall-NexoraReceiver.ps1'      # PC2 (removes firewall rules)
+msiexec /x .\NexoraPrinterLAN-1.1.0-x64.msi /qb
 ```
-Add `-RemoveData` to also delete settings, outbox/received documents and logs.
+This removes the app, the *Nexora Printer LAN* printer and its port, the firewall rules, autostart and shortcuts.
+Settings, pairing codes, job history and received documents in `%LOCALAPPDATA%\Nexora` are kept; delete that
+folder to remove them too.
 
-## 8. Signing
-
-* **No driver signing is needed**: no driver package is installed; the queue uses Microsoft's signed inbox driver.
-  Do not enable test-signing or disable driver signature enforcement for Nexora.
-* The executables are unsigned by default. To sign during packaging (code-signing certificate in the current
-  user's store):
-  ```powershell
-  .\scripts\Package.ps1 -SignCertThumbprint <thumbprint>
-  ```
-  Unsigned packages copied from another PC may show a SmartScreen prompt; the installer unblocks the files it installs.
-
-## 9. Building from source (developer PC)
+## 8. Checks and logs
 
 ```powershell
-.\scripts\Build.ps1                 # debug build
-.\scripts\Test.ps1                  # unit + integration tests
-.\scripts\Package.ps1               # tests, self-contained publish, zips + SHA256SUMS.txt in release\
+powershell -ExecutionPolicy Bypass -File "C:\Program Files\Nexora Printer LAN\scripts\Diagnostics.ps1" -Receiver <PC2 address>
+& "C:\Program Files\Nexora Printer LAN\nexora.exe" discover --key XXXX-XXXX-XXXX-XXXX-XXXX
+& "C:\Program Files\Nexora Printer LAN\nexora.exe" printers
 ```
-For a development run of the queue without the installer (PC1, Administrator):
-`powershell -ExecutionPolicy Bypass -File .\scripts\Install-NexoraQueue.ps1`.
+Setup log: run `msiexec /i <msi> /l*v setup.log`. App logs: `%LOCALAPPDATA%\Nexora\Client\logs`, `…\Receiver\logs`.
+
+## 9. Signing
+
+* **No driver signing is needed** — no driver package is installed. Do not enable test-signing or disable driver
+  signature enforcement for Nexora.
+* The `.msi` and executables are unsigned by default, so Windows SmartScreen may warn when a downloaded copy is
+  opened (*More info → Run anyway*). To sign during packaging with a code-signing certificate:
+  `.\scripts\Package.ps1 -SignCertThumbprint <thumbprint>`.
+
+## 10. Building from source
+
+```powershell
+.\scripts\Build.ps1          # debug build
+.\scripts\Test.ps1           # unit + integration tests
+.\scripts\Package.ps1        # tests, single-file publish, release\NexoraPrinterLAN-<ver>-x64.msi + SHA256SUMS.txt
+```
+Packaging uses the WiX 4 command-line tool (`dotnet tool install --global wix --version 4.0.5`) and its UI, Util
+and Firewall extensions (`wix extension add WixToolset.UI.wixext/4.0.5` etc., run in `installer\msi`).

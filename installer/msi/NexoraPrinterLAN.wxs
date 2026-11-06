@@ -1,0 +1,150 @@
+<!--
+  Nexora Printer LAN - Windows Installer package (WiX 4).
+  Build with scripts\Package.ps1. Variables: Version, PayloadDir (published app + CLI), AssetsDir, ScriptsDir.
+
+  Features (chosen in the Custom Setup page, or ADDLOCAL=Client,Receiver on the command line):
+    Core      the app, Start menu shortcuts, autostart for all users           (always)
+    Client    "Nexora Printer LAN" print queue (inbox Microsoft Print To PDF driver + named-pipe port)
+    Receiver  inbound firewall rules TCP 9102 / UDP 9101, Private profile, local subnet only
+  Installs no driver, port monitor, service or spooler DLL.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall">
+
+  <Package Name="Nexora Printer LAN" Manufacturer="Nexora" Version="$(var.Version)"
+           UpgradeCode="610DCFE7-EBB4-4354-8A8C-12B005F417ED" Scope="perMachine" Compressed="yes" InstallerVersion="500">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="yes" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.AssetsDir)\nexora.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPCOMMENTS" Value="Print from one PC to a printer attached to another PC on the same local network." />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <!-- Detect 1.0.x script installs so the right roles are pre-selected and the old apps are removed. -->
+    <Property Id="LEGACYCLIENT">
+      <DirectorySearch Id="LegacyClientDir" Path="[ProgramFiles64Folder]Nexora Printer LAN\Client" Depth="0">
+        <FileSearch Name="NexoraClient.exe" />
+      </DirectorySearch>
+    </Property>
+    <Property Id="LEGACYRECEIVER">
+      <DirectorySearch Id="LegacyReceiverDir" Path="[ProgramFiles64Folder]Nexora Printer LAN\Receiver" Depth="0">
+        <FileSearch Name="NexoraReceiver.exe" />
+      </DirectorySearch>
+    </Property>
+
+    <!-- UI: Welcome, License, Custom Setup (choose roles), Install, Finish with "Start now". -->
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start Nexora Printer LAN now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#AppExe]" />
+    <CustomAction Id="LaunchApp" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApp"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT REMOVE" />
+    </UI>
+
+    <!-- Close a running Nexora Printer LAN before files are replaced or removed. -->
+    <util:CloseApplication Id="CloseNexora" Target="NexoraPrinterLAN.exe" CloseMessage="no" EndSessionMessage="no"
+                           TerminateProcess="1" RebootPrompt="no" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Nexora Printer LAN">
+        <Directory Id="ScriptsFolder" Name="scripts" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MenuFolder" Name="Nexora Printer LAN" />
+    </StandardDirectory>
+
+    <!-- ===================== Core (always installed) ===================== -->
+    <ComponentGroup Id="CoreComponents" Directory="INSTALLFOLDER">
+      <Component Id="AppExeComponent" Bitness="always64">
+        <File Id="AppExe" Source="$(var.PayloadDir)\app\NexoraPrinterLAN.exe" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="NexoraPrinterLAN"
+                       Type="string" Value="&quot;[#AppExe]&quot; --minimized" />
+      </Component>
+      <Component Id="CliComponent" Bitness="always64">
+        <File Id="CliExe" Source="$(var.PayloadDir)\cli\nexora.exe" KeyPath="yes" />
+      </Component>
+      <Component Bitness="always64"><File Id="AppIco" Source="$(var.AssetsDir)\nexora.ico" /></Component>
+      <Component Bitness="always64"><File Id="DocInstall" Source="$(var.DocsDir)\INSTALLATION.md" /></Component>
+      <Component Bitness="always64"><File Id="DocTrouble" Source="$(var.DocsDir)\TROUBLESHOOTING.md" /></Component>
+      <Component Bitness="always64"><File Id="LicenseTxt" Source="$(var.RootDir)\LICENSE" Name="LICENSE.txt" /></Component>
+      <Component Directory="ScriptsFolder" Bitness="always64"><File Id="DiagnosticsPs1" Source="$(var.ScriptsDir)\Diagnostics.ps1" /></Component>
+      <Component Directory="ScriptsFolder" Bitness="always64"><File Id="RemoveLegacyPs1" Source="Remove-LegacyNexora.ps1" /></Component>
+      <Component Id="MenuShortcuts" Directory="MenuFolder" Bitness="always64">
+        <Shortcut Id="AppShortcut" Name="Nexora Printer LAN" Target="[#AppExe]" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <Shortcut Id="UninstallShortcut" Name="Uninstall Nexora Printer LAN" Target="[System64Folder]msiexec.exe"
+                  Arguments="/x [ProductCode]" Description="Removes Nexora Printer LAN from this PC" />
+        <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Nexora\PrinterLAN" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ===================== Client role ===================== -->
+    <ComponentGroup Id="ClientComponents" Directory="INSTALLFOLDER">
+      <Component Id="ClientRole" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Nexora\PrinterLAN" Name="Client" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Directory="ScriptsFolder" Bitness="always64"><File Id="InstallQueuePs1" Source="$(var.ScriptsDir)\Install-NexoraQueue.ps1" /></Component>
+      <Component Directory="ScriptsFolder" Bitness="always64"><File Id="UninstallQueuePs1" Source="$(var.ScriptsDir)\Uninstall-NexoraQueue.ps1" /></Component>
+    </ComponentGroup>
+
+    <!-- ===================== Receiver role ===================== -->
+    <ComponentGroup Id="ReceiverComponents" Directory="INSTALLFOLDER">
+      <Component Id="ReceiverRole" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Nexora\PrinterLAN" Name="Receiver" Type="integer" Value="1" KeyPath="yes" />
+        <fw:FirewallException Id="FwJobs" Name="Nexora Printer LAN - print jobs (TCP-In)" Program="[#AppExe]"
+                              Port="9102" Protocol="tcp" Scope="localSubnet" Profile="private"
+                              Description="Receives print jobs from Nexora Printer LAN clients on the local network" />
+        <fw:FirewallException Id="FwDiscovery" Name="Nexora Printer LAN - discovery (UDP-In)" Program="[#AppExe]"
+                              Port="9101" Protocol="udp" Scope="localSubnet" Profile="private"
+                              Description="Answers Nexora Printer LAN discovery requests on the local network" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Core" Title="Nexora Printer LAN" Level="1" AllowAbsent="no" AllowAdvertise="no" Display="expand"
+             Description="The Nexora Printer LAN app. Choose below what this PC should do; you can change it later with Modify in Apps &amp; features.">
+      <ComponentGroupRef Id="CoreComponents" />
+
+      <Feature Id="Client" Title="Print to another PC" Level="1" AllowAdvertise="no"
+               Description="Adds the printer “Nexora Printer LAN” to this PC. Documents printed to it are sent over your local network to the PC that has the printer.">
+        <Level Value="2" Condition="LEGACYRECEIVER AND NOT LEGACYCLIENT" />
+        <ComponentGroupRef Id="ClientComponents" />
+      </Feature>
+
+      <Feature Id="Receiver" Title="Receive and print on this PC" Level="2" AllowAdvertise="no"
+               Description="For the PC that has the physical printer. Receives jobs from other PCs and prints them. Opens TCP 9102 and UDP 9101 in Windows Firewall for Private networks on the local subnet only.">
+        <Level Value="1" Condition="LEGACYRECEIVER" />
+        <ComponentGroupRef Id="ReceiverComponents" />
+      </Feature>
+    </Feature>
+
+    <!-- ===================== Custom actions (run as SYSTEM, no UI) ===================== -->
+    <SetProperty Id="RemoveLegacy" Sequence="execute" Before="RemoveLegacy"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#RemoveLegacyPs1]&quot;" />
+    <CustomAction Id="RemoveLegacy" BinaryRef="Wix4UtilCA_X64" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <SetProperty Id="InstallQueue" Sequence="execute" Before="InstallQueue"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#InstallQueuePs1]&quot; -NoPause -PaperSize A4" />
+    <CustomAction Id="InstallQueue" BinaryRef="Wix4UtilCA_X64" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="check" />
+
+    <SetProperty Id="UninstallQueue" Sequence="execute" Before="UninstallQueue"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#UninstallQueuePs1]&quot; -NoPause" />
+    <CustomAction Id="UninstallQueue" BinaryRef="Wix4UtilCA_X64" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RemoveLegacy" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <!-- Queue: created when the Client role is being installed, removed when it is being removed. -->
+      <Custom Action="InstallQueue" After="RemoveLegacy" Condition="&amp;Client=3" />
+      <!-- Not while an upgrade removes the previous version: the new version keeps the same queue. -->
+      <Custom Action="UninstallQueue" Before="RemoveFiles" Condition="&amp;Client=2 AND !Client=3 AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>
