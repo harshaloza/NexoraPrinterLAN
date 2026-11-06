@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Nexora.PrinterIntegration</RootNamespace>
+    <!-- System.Drawing.Printing (GDI print path through the destination printer's own driver). -->
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Nexora.Shared\Nexora.Shared.csproj" />
+    <ProjectReference Include="..\..\Transport\Nexora.Transport\Nexora.Transport.csproj" />
+  </ItemGroup>
+</Project>

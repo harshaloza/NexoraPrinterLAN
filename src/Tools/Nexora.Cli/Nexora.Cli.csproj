@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Nexora.Cli</RootNamespace>
+    <AssemblyName>nexora</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Client\Nexora.Client.Core\Nexora.Client.Core.csproj" />
+    <ProjectReference Include="..\..\Receiver\Nexora.Receiver.Core\Nexora.Receiver.Core.csproj" />
+  </ItemGroup>
+</Project>

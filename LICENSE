@@ -1,0 +1,11 @@
+Copyright (c) 2026 Nexora. All rights reserved.
+
+This software and its source code are proprietary. No license is granted to copy, modify,
+distribute or use it except by written permission of the copyright holder.
+
+(Placeholder chosen by the development assistant: replace with the license the owner selects,
+e.g. MIT or a commercial EULA, before distributing.)
+
+Third-party components used at run time are part of Microsoft Windows and the .NET runtime
+(MIT license, https://github.com/dotnet/runtime/blob/main/LICENSE.TXT), which is redistributed
+in the self-contained packages.

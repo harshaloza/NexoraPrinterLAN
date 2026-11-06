@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Nexora.Client.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Nexora.Shared\Nexora.Shared.csproj" />
+    <ProjectReference Include="..\..\Transport\Nexora.Transport\Nexora.Transport.csproj" />
+    <ProjectReference Include="..\..\Discovery\Nexora.Discovery\Nexora.Discovery.csproj" />
+    <ProjectReference Include="..\..\PrintPipeline\Nexora.PrintPipeline\Nexora.PrintPipeline.csproj" />
+  </ItemGroup>
+</Project>

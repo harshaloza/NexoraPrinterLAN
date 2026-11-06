@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Nexora.Discovery</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Nexora.Shared\Nexora.Shared.csproj" />
+    <ProjectReference Include="..\..\Transport\Nexora.Transport\Nexora.Transport.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Nexora.Receiver.App</RootNamespace>
+    <AssemblyName>NexoraReceiver</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>..\..\..\assets\nexora-receiver.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Nexora.Receiver.Core\Nexora.Receiver.Core.csproj" />
+    <ProjectReference Include="..\..\UI\Nexora.UI\Nexora.UI.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\assets\nexora-receiver.ico" Link="nexora-receiver.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
