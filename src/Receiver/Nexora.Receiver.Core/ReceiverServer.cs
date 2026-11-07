@@ -179,7 +179,7 @@ public sealed class ReceiverServer : IAsyncDisposable
         if (m.SizeBytes <= 0) return "Empty job";
         if (m.Settings.Copies is < 1 or > 999) return "Copies must be 1-999";
         if (m.SizeBytes > _cfg.MaxJobBytes) { code = ErrorCodes.TooLarge; return $"Job is {m.SizeBytes:N0} bytes; this receiver accepts up to {_cfg.MaxJobBytes:N0}"; }
-        if (m.Format != NexoraInfo.PdfMediaType) { code = ErrorCodes.UnsupportedFormat; return $"Format '{m.Format}' is not supported (only {NexoraInfo.PdfMediaType})"; }
+        if (!NexoraInfo.IsSupportedFormat(m.Format)) { code = ErrorCodes.UnsupportedFormat; return $"Format '{m.Format}' is not supported (only {NexoraInfo.PdfMediaType} and {NexoraInfo.XpsMediaType})"; }
         return null;
     }
 

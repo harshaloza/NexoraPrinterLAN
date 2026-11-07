@@ -30,6 +30,19 @@ _Last updated: 2026-11-06 (version 1.1.0, branch `feature/v1.1-combined-app`). R
 * Leftover from 1.0.0 testing on PC1: Windows-generated firewall rules **NexoraReceiver** (Allow, Public, for a deleted
   release-folder exe). Remove as Administrator: `Remove-NetFirewallRule -DisplayName 'NexoraReceiver'`.
 
+## 1.2 in progress — own driver, no PDF (branch `feature/nexora-v4-driver`, not committed yet)
+
+* `driver/NexoraV4`: v4 "Nexora Printer LAN" driver = INF + GPD (A0–A5, Letter, Legal, Tabloid, ANSI C–E, 999 copies,
+  colour) + manifest (XpsFormat=XPS) + empty filter pipeline. `driver/Build-DriverPackage.ps1` builds and signs it
+  (local self-signed cert "Nexora Printer LAN Driver Signing (local)" in CurrentUser\My, or `-CertThumbprint`).
+* Installed on PC1 for testing (approved): cert trusted, driver oem155.inf, queue "Nexora Printer LAN (XPS test)" on
+  `\\.\pipe\NexoraPrinterLAN-XPS`. Undo: `driver\Remove-TestDriver.ps1` (Administrator).
+* Code: XPS format end to end (client capture, transport, receiver store), `XpsPackageNormalizer` (spool XPS is
+  interleaved), `XpsVectorPrinter` (per-page paper/orientation, fit, copies) with automatic raster fallback,
+  receiver setting `XpsPrintMethod`, CLI `xpsinfo` / `xpscapture` / `print --method`.
+* Next for 1.2: Setup installs driver + certificate and points the main queue at the Nexora driver (A4 default),
+  fallback to the inbox driver if the driver cannot be installed; receiver UI for the XPS method; test on PC2/Canon.
+
 ## Remaining tasks
 
 1. PC2: install `NexoraPrinterLAN-1.1.0-x64.msi` (it pre-selects *Receive and print* and removes the 1.0.0 Receiver,

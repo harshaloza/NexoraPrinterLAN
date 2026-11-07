@@ -143,5 +143,12 @@ its own options. It is not done because:
   security fixes) moves Windows printing to the inbox **IPP class driver** plus **Print Support Apps**.
 * The inbox driver already covers the printing need; only paper sizes beyond its list are limited.
 
+**Update (1.2 development):** a prototype showed the signing step is practical for your own PCs. A GPD-only v4
+driver with an empty filter pipeline (Windows passes the application's XPS to the port unchanged — the same model as
+Microsoft's XPS class driver) installs on Windows 11 when its catalog is signed with a certificate the PC trusts. Jobs
+then travel as XPS (vector, no PDF) and the receiver prints them with WPF's XpsDocumentWriter into the destination
+driver (Windows converts XPS to GDI for v3 drivers), falling back to raster printing. For distribution beyond your own
+PCs a publicly trusted code-signing certificate is still required.
+
 The future-proof way to a branded "own printer" is therefore an IPP endpoint (Microsoft IPP Class Driver, no
 driver package) with an optional Print Support App for custom options — see §9.

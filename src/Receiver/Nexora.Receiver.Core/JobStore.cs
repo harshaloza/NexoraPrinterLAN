@@ -165,40 +165,41 @@ public sealed class JobStore
             });
         }
 
-        var inspection = PdfInspector.Inspect(up.PartPath);
+        var check = DocumentFormats.Detect(up.PartPath);
+        var problem = check.Problem ?? (check.Format != meta.Format ? $"content is {check.Format ?? "unknown"}, but the job says {meta.Format}" : null);
         var history = new List<StateChange> { new(now, JobState.Received, $"{meta.SizeBytes} bytes, SHA-256 verified") };
         var stamp = now.ToLocalTime().ToString("yyyyMMdd_HHmmss");
-        var baseName = $"{stamp}_{Path.GetFileNameWithoutExtension(SafeFileName.WithExtension(meta.DocumentName, ".pdf"))}_{meta.JobId.ToString("N")[..8]}";
-        if (!inspection.IsPdf || !inspection.HasEof)
+        var baseName = $"{stamp}_{Path.GetFileNameWithoutExtension(SafeFileName.WithExtension(meta.DocumentName, check.Extension))}_{meta.JobId.ToString("N")[..8]}";
+        string kind = meta.Format == NexoraInfo.XpsMediaType ? "XPS" : "PDF";
+        if (problem is not null)
         {
             // Keep the rejected bytes out of received_jobs; nothing the user might open by mistake.
             var quarantine = Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(_jobs)!, "rejected")).FullName;
             var q = Path.Combine(quarantine, baseName + ".bin");
             File.Move(up.PartPath, q, overwrite: true);
             File.Delete(up.SidecarPath);
-            history.Add(new(now, JobState.Failed, inspection.Problem));
+            history.Add(new(now, JobState.Failed, problem));
             return Save(new ReceiverJobRecord
             {
                 Metadata = meta, State = JobState.Failed, ErrorCode = ErrorCodes.InvalidDocument,
-                Message = $"Not a valid PDF: {inspection.Problem}", ClientAddress = clientAddress,
+                Message = $"Not a valid {kind}: {problem}", ClientAddress = clientAddress,
                 ReceivedUtc = now, StoredFile = q, History = history,
             });
         }
 
-        var target = Path.Combine(_received, baseName + ".pdf");
+        var target = Path.Combine(_received, baseName + check.Extension);
         File.Move(up.PartPath, target, overwrite: false);
         File.Delete(up.SidecarPath);
         AtomicFile.WriteAllText(Path.ChangeExtension(target, ".json"), Json.ToText(new
         {
             meta.JobId, meta.DocumentName, meta.Format, meta.SizeBytes, meta.Sha256,
-            PageCount = meta.PageCount ?? inspection.PageCount, meta.Settings, meta.CreatedUtc,
+            PageCount = meta.PageCount ?? check.PageCount, meta.Settings, meta.CreatedUtc,
             meta.ClientId, meta.ClientName, meta.SubmittedBy, ClientAddress = clientAddress, ReceivedUtc = now,
-            PdfVersion = inspection.Version,
         }, indented: true));
-        history.Add(new(now, JobState.Validated, "PDF structure valid; saved"));
+        history.Add(new(now, JobState.Validated, $"{kind} structure valid; saved"));
         return Save(new ReceiverJobRecord
         {
-            Metadata = meta with { PageCount = meta.PageCount ?? inspection.PageCount },
+            Metadata = meta with { PageCount = meta.PageCount ?? check.PageCount },
             State = JobState.Validated, Message = "Received and verified", ClientAddress = clientAddress,
             ReceivedUtc = now, StoredFile = target, History = history,
         });

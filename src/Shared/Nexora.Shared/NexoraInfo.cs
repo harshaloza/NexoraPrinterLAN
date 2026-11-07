@@ -17,6 +17,9 @@ public static class NexoraInfo
     public const int DefaultTransportPort = 9102;
 
     public const string PdfMediaType = "application/pdf";
+    public const string XpsMediaType = "application/vnd.ms-xpsdocument";
+
+    public static bool IsSupportedFormat(string? format) => format is PdfMediaType or XpsMediaType;
 
     public static string AppVersion =>
         typeof(NexoraInfo).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";

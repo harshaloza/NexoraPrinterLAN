@@ -58,7 +58,7 @@ public sealed class Outbox
 
     public ClientJobRecord Add(JobMetadata meta, string sourceFile, string? message = null, JobState state = JobState.Queued, string? errorCode = null)
     {
-        var target = Path.Combine(_dir, meta.JobId.ToString("N") + ".pdf");
+        var target = Path.Combine(_dir, meta.JobId.ToString("N") + (meta.Format == Shared.NexoraInfo.XpsMediaType ? ".xps" : ".pdf"));
         if (!sourceFile.Equals(target, StringComparison.OrdinalIgnoreCase)) File.Move(sourceFile, target, overwrite: false);
         return Save(new ClientJobRecord { Metadata = meta, FilePath = target, State = state, Message = message ?? "Waiting to send", ErrorCode = errorCode });
     }

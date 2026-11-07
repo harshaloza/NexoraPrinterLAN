@@ -121,30 +121,30 @@ public sealed class ClientEngine : IAsyncDisposable
         var id = Guid.NewGuid();
         if (job.Problem is not null)
         {
-            var meta = BuildMeta(id, job.DocumentName, job.SizeBytes, new string('0', 64), job.PageCount, job.Settings, job.UserName);
+            var meta = BuildMeta(id, job.DocumentName, job.SizeBytes, new string('0', 64), job.PageCount, job.Settings, job.UserName, job.Format);
             Outbox.Add(meta, job.FilePath, job.Problem, JobState.Failed, ErrorCodes.InvalidDocument);
             _log.Warn("job.invalid", $"Captured job '{job.DocumentName}' is not sendable: {job.Problem}");
             return;
         }
         var sha = await Task.Run(() => Hashing.Sha256File(job.FilePath));
-        var m = BuildMeta(id, job.DocumentName, job.SizeBytes, sha, job.PageCount, job.Settings, job.UserName);
+        var m = BuildMeta(id, job.DocumentName, job.SizeBytes, sha, job.PageCount, job.Settings, job.UserName, job.Format);
         Outbox.Add(m, job.FilePath);
-        _log.Info("job.queued", $"Queued '{job.DocumentName}' for sending", new { jobId = id, job.SizeBytes, copies = job.Settings.Copies });
+        _log.Info("job.queued", $"Queued '{job.DocumentName}' for sending", new { jobId = id, job.SizeBytes, job.Format, copies = job.Settings.Copies });
         Wake();
     }
 
-    /// <summary>Queues an existing PDF file (test page, drag-and-drop, CLI). The file is copied into the outbox.</summary>
+    /// <summary>Queues an existing PDF or XPS file (test page, drag-and-drop, CLI). The file is copied into the outbox.</summary>
     public ClientJobRecord SubmitPdf(string path, string? documentName = null, PrintSettings? settings = null)
     {
         var info = new FileInfo(path);
         if (!info.Exists) throw new FileNotFoundException("File not found", path);
         if (info.Length > _cfg.MaxJobBytes) throw new InvalidOperationException($"File is larger than the {_cfg.MaxJobBytes / (1024 * 1024)} MB limit");
-        var inspection = PdfInspector.Inspect(path);
-        if (!inspection.IsPdf) throw new InvalidOperationException($"Not a PDF: {inspection.Problem}");
+        var check = DocumentFormats.Detect(path);
+        if (!check.IsValid) throw new InvalidOperationException($"Cannot send this file: {check.Problem}");
         var id = Guid.NewGuid();
         var tmp = Path.Combine(Paths.Sub("capture"), id.ToString("N") + ".capture");
         File.Copy(path, tmp);
-        var meta = BuildMeta(id, documentName ?? Path.GetFileName(path), info.Length, Hashing.Sha256File(tmp), inspection.PageCount, settings ?? new PrintSettings(), Environment.UserName);
+        var meta = BuildMeta(id, documentName ?? Path.GetFileName(path), info.Length, Hashing.Sha256File(tmp), check.PageCount, settings ?? new PrintSettings(), Environment.UserName, check.Format!);
         var rec = Outbox.Add(meta, tmp);
         Wake();
         return rec;
@@ -158,9 +158,9 @@ public sealed class ClientEngine : IAsyncDisposable
         finally { File.Delete(tmp); }
     }
 
-    private JobMetadata BuildMeta(Guid id, string doc, long size, string sha, int? pages, PrintSettings settings, string? user) => new()
+    private JobMetadata BuildMeta(Guid id, string doc, long size, string sha, int? pages, PrintSettings settings, string? user, string format) => new()
     {
-        JobId = id, DocumentName = doc, Format = NexoraInfo.PdfMediaType, SizeBytes = size, Sha256 = sha, PageCount = pages,
+        JobId = id, DocumentName = doc, Format = format, SizeBytes = size, Sha256 = sha, PageCount = pages,
         Settings = settings, CreatedUtc = DateTimeOffset.UtcNow, ClientId = _cfg.ClientId, ClientName = _cfg.ClientName, SubmittedBy = user,
     };
 

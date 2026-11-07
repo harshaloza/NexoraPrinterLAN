@@ -250,7 +250,7 @@ public sealed class ReceiverViewModel : ObservableObject
         {
             var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
             {
-                JobId = Guid.NewGuid(), PdfPath = file, DocumentName = "Nexora test page", PrinterName = printer,
+                JobId = Guid.NewGuid(), DocumentPath = file, DocumentName = "Nexora test page", PrinterName = printer,
                 FitToPrintableArea = !_host.Config.Scaling.Equals(PrintScaling.ActualSize), MaxRenderDpi = _host.Config.MaxRenderDpi,
                 TrackTimeout = TimeSpan.FromMinutes(2),
             }, null, default);

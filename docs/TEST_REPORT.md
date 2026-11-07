@@ -1,5 +1,23 @@
 # Nexora Printer LAN — Test report
 
+## 1.2 development: own v4 driver + XPS without PDF (2026-11-06, PC1, branch `feature/nexora-v4-driver`)
+
+Automated: **71/71 unit, 25/25 integration passed** (Debug). New: format detection, XPS piece re-assembly, XPS transfer,
+PDF-announced-as-XPS rejection, XPS raster printing through a real driver, XPS vector printing with paper/orientation/copies.
+
+| Test | Result |
+|---|---|
+| Driver package (INF + GPD + manifest + empty filter pipeline, no DLL) passes Inf2Cat (0 errors, 0 warnings) | Passed |
+| Catalog signed with a local self-signed certificate; certificate trusted in LocalMachine Root + TrustedPublisher; `pnputil /add-driver` + `Add-PrinterDriver` on Windows 11 build 26300 | **Passed** — no test-signing, no signature-enforcement change |
+| Print dialogs show papers A0–A5, Letter, Legal, Tabloid, ANSI C/D/E; copies up to 999; colour; 300/600 dpi | Passed |
+| Out-Printer, Notepad, GDI A3-landscape graphics, Word → test queue → **XPS** on the pipe (no PDF) | Passed |
+| Word/Notepad pages arrive as vector text (Glyphs + embedded fonts) and vector shapes, no images | Passed |
+| Receiver: XPS printed as images through *Microsoft Print to PDF* (file), A3 landscape preserved | Passed |
+| Receiver: XPS printed as vectors to the Nexora test queue: tickets carry copies = 2, ISOA3, Landscape on job and pages | Passed |
+| End to end: Word → Nexora driver → client (XPS) → receiver → stored `.xps`, renders correctly | Passed |
+| XPS vector printing into a **GDI (v3) driver such as Canon CAPT** (Windows XPS→GDI conversion) | **Not tested** — needs PC2; raster fallback is automatic if it fails |
+| Queue default paper | Came out Letter despite GPD default A4 → Setup must set A4 (as for the 1.1 queue) |
+
 ## Version 1.1.0 (2026-11-06, PC1 192.168.1.14)
 
 Automated: `scripts\Test.ps1` → **63/63 unit, 21/21 integration passed** (Release). The real-queue capture test

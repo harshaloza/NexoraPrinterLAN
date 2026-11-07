@@ -9,7 +9,7 @@ namespace Nexora.PrinterIntegration;
 /// library is shipped. Pages become bitmaps at the destination printer's resolution and are then drawn
 /// through the printer's installed driver by <see cref="GdiPdfPrinter"/>.
 /// </summary>
-public sealed class PdfRenderer : IDisposable
+public sealed class PdfRenderer : IPageSource
 {
     private readonly FileStream _file;
     private readonly IRandomAccessStream _ras;
