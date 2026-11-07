@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0 — 2026-11-07
+
+### Added
+- **Nexora's own printer driver** "Nexora Printer LAN" (v4, text files only: INF, GPD, manifest, empty filter
+  pipeline). Papers A0–A5, Letter, Legal, Tabloid, ANSI C/D/E; up to 999 copies; colour/grey/mono; 300/600 dpi.
+  Setup signs it with the Nexora driver-signing certificate and trusts that certificate on the PC.
+- **No PDF anywhere**: with the Nexora driver, jobs travel as XPS (Windows' own print format, vector).
+- Receiver prints XPS **as vectors** through the destination printer's driver (per-page paper, orientation, copies,
+  shrink-to-fit), falling back to image printing automatically; setting *Printing jobs from the Nexora driver*.
+- CLI: `xpsinfo`, `xpscapture`, `print --method auto|vector|raster`.
+
+### Changed
+- Setup's *Print to another PC* role installs the Nexora driver and switches an existing "Nexora Printer LAN" printer
+  to it; if the driver cannot be installed it uses Windows' Microsoft Print To PDF driver as before (PDF jobs).
+- Uninstall also removes the Nexora driver, its driver-store package and the trusted certificate.
+- PDF jobs from 1.0/1.1 clients are still accepted and printed.
+
 ## 1.1.0 — 2026-11-06
 
 ### Changed

@@ -51,7 +51,7 @@
             <StackPanel>
                 <TextBlock Text="Nexora printer" Style="{StaticResource H1}"/>
                 <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,18"
-                           Text="The Nexora queue uses Windows' own “Microsoft Print To PDF” driver and a local port that hands each job to this app. No third-party driver is installed."/>
+                           Text="The Nexora printer uses Nexora's own driver, which hands each job to this app as XPS (vector, no PDF). If that driver cannot be installed, Windows' “Microsoft Print To PDF” driver is used instead and jobs are sent as PDF."/>
                 <Border Style="{StaticResource Card}" HorizontalAlignment="Left" MinWidth="560">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">

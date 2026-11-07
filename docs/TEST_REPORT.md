@@ -18,6 +18,17 @@ PDF-announced-as-XPS rejection, XPS raster printing through a real driver, XPS v
 | XPS vector printing into a **GDI (v3) driver such as Canon CAPT** (Windows XPS→GDI conversion) | **Not tested** — needs PC2; raster fallback is automatic if it fails |
 | Queue default paper | Came out Letter despite GPD default A4 → Setup must set A4 (as for the 1.1 queue) |
 
+### Setup 1.2.0 on PC1 (2026-11-07)
+
+| Test | Result |
+|---|---|
+| Upgrade 1.1.0 → 1.2.0 (`/qb`): certificate trusted, driver added to the driver store, existing "Nexora Printer LAN" switched from Microsoft Print To PDF to the **Nexora driver**, default paper **A4**, app 1.2.0 running and owning the pipe | Passed |
+| Uninstall: queue, port, Nexora driver, driver-store package and certificate removed; user data kept | Passed |
+| Fresh install after uninstall: everything back with the Nexora driver | Passed |
+| Automated tests on the installed build: 71/71 unit, 25/25 integration (vector-queue test self-skipped because the prototype test queue was removed; it passed earlier) | Passed |
+| A real document printed through the installed 1.2 driver to PC2 / Canon | **Not tested** — PC2 is in print mode (real paper); left for the user |
+| Receiver on PC2 upgraded to 1.2; vector printing into the Canon CAPT (GDI) driver | **Not tested** |
+
 ## Version 1.1.0 (2026-11-06, PC1 192.168.1.14)
 
 Automated: `scripts\Test.ps1` → **63/63 unit, 21/21 integration passed** (Release). The real-queue capture test

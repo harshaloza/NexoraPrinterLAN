@@ -8,6 +8,8 @@ public sealed record QueueStatus(bool Exists, bool PortCorrect, bool DriverCorre
     bool IsDefault, bool DriverAvailable, string Summary)
 {
     public bool Healthy => Exists && PortCorrect && DriverCorrect;
+    /// <summary>True when the queue uses Nexora's own v4 driver (jobs travel as XPS); false = inbox PDF driver.</summary>
+    public bool UsesNexoraDriver => NexoraInfo.NexoraDriverName.Equals(DriverName, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Reports the real state of the "Nexora Printer LAN" queue and launches the (elevated) install script.</summary>
@@ -17,14 +19,19 @@ public static class QueueInspector
     {
         var printers = Winspool.EnumeratePrinters();
         var q = printers.FirstOrDefault(p => p.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
-        bool driverAvailable = Winspool.EnumerateDriverNames().Contains(NexoraInfo.SourceDriverName, StringComparer.OrdinalIgnoreCase);
+        var drivers = Winspool.EnumerateDriverNames();
+        bool driverAvailable = drivers.Contains(NexoraInfo.NexoraDriverName, StringComparer.OrdinalIgnoreCase)
+            || drivers.Contains(NexoraInfo.SourceDriverName, StringComparer.OrdinalIgnoreCase);
         if (q is null)
             return new(false, false, false, null, null, false, driverAvailable,
-                driverAvailable ? $"Queue '{queueName}' is not installed" : $"Queue '{queueName}' is not installed and the '{NexoraInfo.SourceDriverName}' driver is missing");
+                driverAvailable ? $"Queue '{queueName}' is not installed" : $"Queue '{queueName}' is not installed and no usable driver is present");
         bool portOk = portName.Equals(q.PortName, StringComparison.OrdinalIgnoreCase);
-        bool driverOk = NexoraInfo.SourceDriverName.Equals(q.DriverName, StringComparison.OrdinalIgnoreCase);
+        bool nexora = NexoraInfo.NexoraDriverName.Equals(q.DriverName, StringComparison.OrdinalIgnoreCase);
+        bool driverOk = nexora || NexoraInfo.SourceDriverName.Equals(q.DriverName, StringComparison.OrdinalIgnoreCase);
         bool isDefault = queueName.Equals(Winspool.GetDefaultPrinter(), StringComparison.OrdinalIgnoreCase);
-        string summary = portOk && driverOk ? "Installed" : $"Misconfigured (port '{q.PortName}', driver '{q.DriverName}')";
+        string summary = !(portOk && driverOk) ? $"Misconfigured (port '{q.PortName}', driver '{q.DriverName}')"
+            : nexora ? "Installed — Nexora driver (sends XPS, no PDF)"
+            : "Installed — Windows' Microsoft Print To PDF driver (sends PDF)";
         return new(true, portOk, driverOk, q.PortName, q.DriverName, isDefault, driverAvailable, summary);
     }
 
