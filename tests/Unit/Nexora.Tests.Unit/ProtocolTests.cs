@@ -219,6 +219,14 @@ public class DiscoveryCodecTests
     [InlineData("{\"protocol\":\"NexoraDiscovery/1\"}")]
     public void Garbage_is_ignored(string s) => Assert.Null(DiscoveryCodec.DecodeReply(Encoding.UTF8.GetBytes(s), "n", null, out _));
 
+    [Theory]
+    [InlineData("192.168.1.14", 24, "192.168.1.255")]
+    [InlineData("192.168.0.43", 24, "192.168.0.255")]
+    [InlineData("10.1.2.3", 8, "10.255.255.255")]
+    [InlineData("172.16.5.9", 20, "172.16.15.255")]
+    public void Directed_broadcast_address(string ip, int prefix, string expected) =>
+        Assert.Equal(expected, DiscoveryClient.DirectedBroadcast(System.Net.IPAddress.Parse(ip), prefix).ToString());
+
     [Fact]
     public void Auto_select_picks_single_trusted_receiver_only()
     {
