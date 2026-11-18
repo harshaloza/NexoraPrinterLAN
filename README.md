@@ -64,3 +64,7 @@ Requirements: Windows 10/11 x64, .NET 8+ SDK.
 .\scripts\Test.ps1
 ```
 Security model: [docs/SECURITY.md](docs/SECURITY.md).
+
+## License
+[MIT](LICENSE). The self-contained packages include the .NET runtime, which is also
+[MIT licensed](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT); printing uses components of Microsoft Windows.
