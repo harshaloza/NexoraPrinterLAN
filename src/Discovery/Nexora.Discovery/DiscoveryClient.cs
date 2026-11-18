@@ -65,12 +65,20 @@ public static class DiscoveryClient
             foreach (var ua in nic.GetIPProperties().UnicastAddresses)
             {
                 if (ua.Address.AddressFamily != AddressFamily.InterNetwork || ua.PrefixLength is <= 0 or >= 31) continue;
-                var ip = BitConverter.ToUInt32(ua.Address.GetAddressBytes().Reverse().ToArray());
-                var mask = uint.MaxValue << (32 - ua.PrefixLength);
-                var bcast = ip | ~mask;
-                yield return new IPAddress(BitConverter.GetBytes(bcast).Reverse().ToArray());
+                yield return DirectedBroadcast(ua.Address, ua.PrefixLength);
             }
         }
+    }
+
+    /// <summary>Directed broadcast address of an IPv4 address/prefix, e.g. 192.168.1.14/24 → 192.168.1.255.</summary>
+    public static IPAddress DirectedBroadcast(IPAddress address, int prefixLength)
+    {
+        // Network byte order is big-endian; explicit conversion avoids the Enumerable/Span Reverse ambiguity of C# 14.
+        uint ip = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(address.GetAddressBytes());
+        uint mask = prefixLength == 0 ? 0u : uint.MaxValue << (32 - prefixLength);
+        var bytes = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes, ip | ~mask);
+        return new IPAddress(bytes);
     }
 
     /// <summary>

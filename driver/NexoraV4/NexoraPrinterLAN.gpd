@@ -1,0 +1,227 @@
+*%
+*% Nexora Printer LAN - v4 GPD (XPS pass-through virtual printer)
+*% Copyright (c) 2026 Nexora
+*%
+*% Master units are 1/1200 inch. Paper sizes are borderless (printable area = whole sheet): the receiving PC
+*% applies the real printer's margins. Large sheets (A2-A0, ANSI C-E) are for CAD drawings.
+*%
+*GPDSpecVersion: "1.0"
+*GPDFileVersion: "1.2"
+*GPDFileName:    "NexoraPrinterLAN.gpd"
+*Include:        "StdNames.gpd"
+*Include:        "MSxpsinc.gpd"
+*ResourceDLL:    "unires.dll"
+
+*ModelName:      "Nexora Printer LAN"
+*MasterUnits:    PAIR(1200, 1200)
+*PrinterType:    PAGE
+*MaxCopies:      999
+
+*PrintSchemaPrivateNamespaceURI: "http://schemas.nexora.local/printerlan/2026/printschemakeywords"
+
+*%******************************************************************************
+*%                             Orientation
+*%******************************************************************************
+*Feature: Orientation
+{
+    *rcNameID: =ORIENTATION_DISPLAY
+    *DefaultOption: PORTRAIT
+
+    *Option: PORTRAIT
+    {
+        *rcNameID: =PORTRAIT_DISPLAY
+    }
+
+    *Option: LANDSCAPE_CC270
+    {
+        *rcNameID: =LANDSCAPE_DISPLAY
+    }
+}
+
+*%******************************************************************************
+*%                              Resolution
+*%******************************************************************************
+*Feature: Resolution
+{
+    *rcNameID: =RESOLUTION_DISPLAY
+    *DefaultOption: 600dpi
+
+    *Option: 300dpi
+    {
+        *Name: "300 x 300 " =DOTS_PER_INCH
+        *DPI: PAIR(300, 300)
+        *TextDPI: PAIR(300, 300)
+        *SpotDiameter: 100
+    }
+
+    *Option: 600dpi
+    {
+        *Name: "600 x 600 " =DOTS_PER_INCH
+        *DPI: PAIR(600, 600)
+        *TextDPI: PAIR(600, 600)
+        *SpotDiameter: 100
+    }
+}
+
+*%******************************************************************************
+*%                            Paper Size
+*%******************************************************************************
+*Feature: PaperSize
+{
+    *rcNameID: =PAPER_SIZE_DISPLAY
+    *DefaultOption: A4
+
+    *Option: A5
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(6992, 9921)
+    }
+
+    *Option: A4
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(9921, 14031)
+    }
+
+    *Option: A3
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(14031, 19843)
+    }
+
+    *Option: ISO_A2
+    {
+        *Name: "A2 (420 x 594 mm)"
+        *PrintSchemaKeywordMap: "ISOA2"
+        *PageDimensions: PAIR(19843, 28063)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(19843, 28063)
+    }
+
+    *Option: ISO_A1
+    {
+        *Name: "A1 (594 x 841 mm)"
+        *PrintSchemaKeywordMap: "ISOA1"
+        *PageDimensions: PAIR(28063, 39732)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(28063, 39732)
+    }
+
+    *Option: ISO_A0
+    {
+        *Name: "A0 (841 x 1189 mm)"
+        *PrintSchemaKeywordMap: "ISOA0"
+        *PageDimensions: PAIR(39732, 56173)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(39732, 56173)
+    }
+
+    *Option: LETTER
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(10200, 13200)
+    }
+
+    *Option: LEGAL
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(10200, 16800)
+    }
+
+    *Option: TABLOID
+    {
+        *rcNameID: =RCID_DMPAPER_SYSTEM_NAME
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(13200, 20400)
+    }
+
+    *Option: ANSI_C
+    {
+        *Name: "ANSI C (17 x 22 in)"
+        *PrintSchemaKeywordMap: "NorthAmericaCSheet"
+        *PageDimensions: PAIR(20400, 26400)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(20400, 26400)
+    }
+
+    *Option: ANSI_D
+    {
+        *Name: "ANSI D (22 x 34 in)"
+        *PrintSchemaKeywordMap: "NorthAmericaDSheet"
+        *PageDimensions: PAIR(26400, 40800)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(26400, 40800)
+    }
+
+    *Option: ANSI_E
+    {
+        *Name: "ANSI E (34 x 44 in)"
+        *PrintSchemaKeywordMap: "NorthAmericaESheet"
+        *PageDimensions: PAIR(40800, 52800)
+        *PrintableOrigin: PAIR(0, 0)
+        *PrintableArea: PAIR(40800, 52800)
+    }
+}
+
+*%******************************************************************************
+*%                            Media Type
+*%******************************************************************************
+*Feature: MediaType
+{
+    *rcNameID: =MEDIA_TYPE_DISPLAY
+    *DefaultOption: STANDARD
+
+    *Option: STANDARD
+    {
+        *rcNameID: =PLAIN_PAPER_DISPLAY
+    }
+}
+
+*%******************************************************************************
+*%                            Colour
+*%******************************************************************************
+*Feature: ColorMode
+{
+    *rcNameID: =COLOR_PRINTING_MODE_DISPLAY
+    *DefaultOption: Color
+
+    *Option: Mono
+    {
+        *rcNameID: =MONO_DISPLAY
+        *DevNumOfPlanes: 1
+        *DevBPP: 1
+        *Color?: FALSE
+    }
+
+    *Option: Grayscale
+    {
+        *rcNameID: =8BPP_DISPLAY
+        *DevNumOfPlanes: 1
+        *DevBPP: 8
+        *DrvBPP: 8
+        *PaletteSize: 256
+        *Color?: FALSE
+    }
+
+    *Option: Color
+    {
+        *rcNameID: =24BPP_DISPLAY
+        *DevNumOfPlanes: 1
+        *DevBPP: 24
+        *DrvBPP: 24
+        *PaletteSize: 1
+    }
+}
+
+*%******************************************************************************
+*%                         Cursor commands (required by the GPD parser)
+*%******************************************************************************
+*Command: CmdCR { *Cmd : "" }
+*Command: CmdLF { *Cmd : "" }
+*Command: CmdFF { *Cmd : "" }
+*Command: CmdSendBlockData { *Cmd : "" }

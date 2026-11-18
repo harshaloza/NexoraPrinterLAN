@@ -4,9 +4,10 @@
 
   Features (chosen in the Custom Setup page, or ADDLOCAL=Client,Receiver on the command line):
     Core      the app, Start menu shortcuts, autostart for all users           (always)
-    Client    "Nexora Printer LAN" print queue (inbox Microsoft Print To PDF driver + named-pipe port)
+    Client    "Nexora Printer LAN" print queue on a named-pipe port, using Nexora's own signed v4 driver (XPS);
+              falls back to the inbox Microsoft Print To PDF driver if that driver cannot be installed
     Receiver  inbound firewall rules TCP 9102 / UDP 9101, Private profile, local subnet only
-  Installs no driver, port monitor, service or spooler DLL.
+  Installs no port monitor, service or spooler DLL. The Nexora driver is text files only (INF, GPD, manifest).
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
@@ -56,6 +57,7 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Nexora Printer LAN">
         <Directory Id="ScriptsFolder" Name="scripts" />
+        <Directory Id="DriverFolder" Name="driver" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
@@ -94,6 +96,15 @@
       </Component>
       <Component Directory="ScriptsFolder" Bitness="always64"><File Id="InstallQueuePs1" Source="$(var.ScriptsDir)\Install-NexoraQueue.ps1" /></Component>
       <Component Directory="ScriptsFolder" Bitness="always64"><File Id="UninstallQueuePs1" Source="$(var.ScriptsDir)\Uninstall-NexoraQueue.ps1" /></Component>
+      <!-- Nexora's own v4 printer driver package (signed catalog) and the certificate that signed it. -->
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvInf" Source="$(var.DriverDir)\NexoraV4\nexoraprinterlan.inf" /></Component>
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvCat" Source="$(var.DriverDir)\NexoraV4\nexoraprinterlan.cat" /></Component>
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvGpd" Source="$(var.DriverDir)\NexoraV4\NexoraPrinterLAN.gpd" /></Component>
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvManifest" Source="$(var.DriverDir)\NexoraV4\NexoraPrinterLAN-manifest.ini" /></Component>
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvPipeline" Source="$(var.DriverDir)\NexoraV4\NexoraPrinterLAN-PipelineConfig.xml" /></Component>
+      <?if $(var.HasDriverCert) = "yes" ?>
+      <Component Directory="DriverFolder" Bitness="always64"><File Id="DrvCer" Source="$(var.DriverDir)\NexoraDriverSigning.cer" /></Component>
+      <?endif?>
     </ComponentGroup>
 
     <!-- ===================== Receiver role ===================== -->
@@ -132,7 +143,7 @@
     <CustomAction Id="RemoveLegacy" BinaryRef="Wix4UtilCA_X64" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="ignore" />
 
     <SetProperty Id="InstallQueue" Sequence="execute" Before="InstallQueue"
-                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#InstallQueuePs1]&quot; -NoPause -PaperSize A4" />
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[#InstallQueuePs1]&quot; -NoPause -PaperSize A4 -DriverDir &quot;[DriverFolder].&quot;" />
     <CustomAction Id="InstallQueue" BinaryRef="Wix4UtilCA_X64" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="check" />
 
     <SetProperty Id="UninstallQueue" Sequence="execute" Before="UninstallQueue"

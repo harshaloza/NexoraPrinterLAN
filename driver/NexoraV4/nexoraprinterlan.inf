@@ -1,0 +1,42 @@
+; Nexora Printer LAN - v4 printer driver (XPS pass-through, no filter DLL)
+; Copyright (c) 2026 Nexora
+
+[Version]
+Signature="$Windows NT$"
+Class=Printer
+ClassGuid={4D36E979-E325-11CE-BFC1-08002BE10318}
+Provider=%ProviderString%
+CatalogFile=nexoraprinterlan.cat
+ClassVer=4.0
+DriverVer=11/06/2026,1.2.0.0
+PnpLockdown=1
+
+[Manufacturer]
+%ManufacturerName%=Nexora,NTamd64
+
+[Nexora.NTamd64]
+"Nexora Printer LAN"=DriverInstall, {F8332EB3-3384-46AE-AC35-2B5D5CFF0C28}
+
+[DriverInstall]
+CopyFiles=DriverFiles
+
+[DriverFiles]
+NexoraPrinterLAN.gpd
+NexoraPrinterLAN-manifest.ini
+NexoraPrinterLAN-PipelineConfig.xml
+
+[DestinationDirs]
+DefaultDestDir = 66000
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+NexoraPrinterLAN.gpd=1
+NexoraPrinterLAN-manifest.ini=1
+NexoraPrinterLAN-PipelineConfig.xml=1
+
+[Strings]
+ManufacturerName="Nexora"
+ProviderString="Nexora"
+DiskName="Nexora Printer LAN driver"

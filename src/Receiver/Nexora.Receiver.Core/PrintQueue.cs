@@ -16,7 +16,7 @@ public sealed class PrintQueue : IAsyncDisposable
     public const string TestModeMessage = "Saved in test mode — not printed";
     private readonly JobStore _store;
     private readonly Func<ReceiverConfig> _cfg;
-    private readonly GdiPdfPrinter _printer = new();
+    private readonly DocumentPrinter _printer = new();
     private readonly LogScope _log;
     private readonly Channel<Guid> _queue = Channel.CreateUnbounded<Guid>();
     private readonly CancellationTokenSource _cts = new();
@@ -120,12 +120,13 @@ public sealed class PrintQueue : IAsyncDisposable
                 var outcome = await _printer.PrintAsync(new PrintRequest
                 {
                     JobId = id,
-                    PdfPath = r.StoredFile!,
+                    DocumentPath = r.StoredFile!,
                     DocumentName = r.Metadata.DocumentName,
                     PrinterName = printer,
                     Settings = r.Metadata.Settings,
                     FitToPrintableArea = cfg.Scaling == PrintScaling.FitToPrintableArea,
                     MaxRenderDpi = cfg.MaxRenderDpi,
+                    XpsMethod = cfg.XpsPrintMethod,
                     PrintToFile = TestPrintToFile?.Invoke(id),
                 },(state, msg) => _store.Update(id, x => x with { State = state, Message = msg }), _currentCts.Token);
 

@@ -5,11 +5,13 @@ During Setup you choose what each PC does:
 
 | Role (Setup feature) | Choose it on | What it adds |
 |---|---|---|
-| **Print to another PC** | the PC you print from (PC1) | the printer **Nexora Printer LAN** (Windows' own *Microsoft Print To PDF* driver + local port `\\.\pipe\NexoraPrinterLAN`) |
+| **Print to another PC** | the PC you print from (PC1) | the printer **Nexora Printer LAN** with Nexora's own driver (jobs sent as XPS, no PDF) on local port `\\.\pipe\NexoraPrinterLAN`; the Nexora driver-signing certificate is added to the PC's trusted certificates. Falls back to Windows' *Microsoft Print To PDF* driver if the Nexora driver cannot be installed |
 | **Receive and print on this PC** | the PC with the physical printer (PC2) | inbound firewall rules TCP 9102 / UDP 9101 — Private networks, local subnet, `NexoraPrinterLAN.exe` only |
 
 A PC can have both roles. Requirements: Windows 10 2004 (build 19041) or newer, x64, administrator approval.
-.NET is **not** required (the app is self-contained). No printer driver, port monitor or service is installed.
+.NET is **not** required (the app is self-contained). No port monitor, service or spooler DLL is installed; the Nexora driver consists of text files only (INF, GPD, manifest).
+
+**Upgrade both PCs to the same version.** A 1.2 client sends XPS jobs, which a 1.0/1.1 receiver rejects (*format not supported*). A 1.2 receiver still accepts PDF jobs from older clients.
 
 ## 1. Install on the printer PC (PC2) first
 
@@ -24,7 +26,7 @@ A PC can have both roles. Requirements: Windows 10 2004 (build 19041) or newer, 
 
 Command line (PowerShell as Administrator on PC2):
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Receiver /qb
+msiexec /i .\NexoraPrinterLAN-1.2.0-x64.msi ADDLOCAL=Receiver /qb
 ```
 
 ## 2. Install on the PC you print from (PC1)
@@ -38,7 +40,7 @@ msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Receiver /qb
 
 Command line (PowerShell as Administrator on PC1):
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Client /qb
+msiexec /i .\NexoraPrinterLAN-1.2.0-x64.msi ADDLOCAL=Client /qb
 ```
 
 ## 3. Print
@@ -60,8 +62,8 @@ jobs* (PC2).
 *Settings → Apps → Installed apps → Nexora Printer LAN → ⋯ → Modify* (or run the `.msi` again → *Change*), then
 pick the roles. Or, as Administrator:
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi ADDLOCAL=Receiver /qb    # add a role
-msiexec /i .\NexoraPrinterLAN-1.1.0-x64.msi REMOVE=Receiver /qb      # remove a role
+msiexec /i .\NexoraPrinterLAN-1.2.0-x64.msi ADDLOCAL=Receiver /qb    # add a role
+msiexec /i .\NexoraPrinterLAN-1.2.0-x64.msi REMOVE=Receiver /qb      # remove a role
 ```
 Restart Nexora Printer LAN (tray → Exit, then start it) after changing roles.
 
@@ -79,7 +81,7 @@ Downgrades are refused. To go back to an older version, uninstall and install th
 *Settings → Apps → Installed apps → Nexora Printer LAN → Uninstall*, Start menu → **Uninstall Nexora Printer LAN**,
 or as Administrator:
 ```powershell
-msiexec /x .\NexoraPrinterLAN-1.1.0-x64.msi /qb
+msiexec /x .\NexoraPrinterLAN-1.2.0-x64.msi /qb
 ```
 This removes the app, the *Nexora Printer LAN* printer and its port, the firewall rules, autostart and shortcuts.
 Settings, pairing codes, job history and received documents in `%LOCALAPPDATA%\Nexora` are kept; delete that
@@ -96,8 +98,12 @@ Setup log: run `msiexec /i <msi> /l*v setup.log`. App logs: `%LOCALAPPDATA%\Nexo
 
 ## 9. Signing
 
-* **No driver signing is needed** — no driver package is installed. Do not enable test-signing or disable driver
-  signature enforcement for Nexora.
+* **The Nexora driver package is signed** (its catalog) by `scripts\Package.ps1`. By default it uses the local
+  certificate *Nexora Printer LAN Driver Signing (local)*, created on the build PC with a non-exportable private key;
+  Setup adds its public part to the target PC's *Trusted Root* and *Trusted Publishers* so Windows accepts the
+  driver. That is suitable for PCs you manage. For PCs you do not manage, sign with a purchased code-signing
+  certificate (`-SignCertThumbprint`); no certificate is then added to the PC. Uninstall removes the certificate.
+  Test-signing mode and driver-signature enforcement are never changed.
 * The `.msi` and executables are unsigned by default, so Windows SmartScreen may warn when a downloaded copy is
   opened (*More info → Run anyway*). To sign during packaging with a code-signing certificate:
   `.\scripts\Package.ps1 -SignCertThumbprint <thumbprint>`.

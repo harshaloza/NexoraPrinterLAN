@@ -45,6 +45,8 @@ try
         case "print": return await PrintAsync();
         case "printers": return Printers();
         case "pdfinfo": return PdfInfo();
+        case "xpsinfo": return XpsInfoCmd();
+        case "xpscapture": return await XpsCaptureAsync();
         case "queue": return Queue();
         default:
             Console.Error.WriteLine($"Unknown command '{cmd}'.");
@@ -79,11 +81,16 @@ int Usage()
           nexora status JOBID --key CODE [--to HOST[:PORT]]
           nexora testpdf OUT.pdf [--pages N] [--size A4|A3|Letter] [--landscape] [--mb N]
           nexora pairing [--data DIR] [--regenerate]     Show (or regenerate) the receiver pairing code.
-          nexora print FILE.pdf --printer NAME [--to-file OUT] [--actual-size] [--copies N]
-              Print a PDF locally through a Windows printer driver (receiver print path test).
+          nexora print FILE.pdf|FILE.xps --printer NAME [--to-file OUT] [--actual-size] [--copies N] [--method auto|vector|raster]
+              Print locally through a Windows printer driver (receiver print path test). XPS defaults to vector with
+              raster fallback; --to-file applies to the raster path only.
           nexora printers                                 List installed printers and their real status.
           nexora pdfinfo FILE.pdf [--png OUT.png] [--page N] [--dpi N]
               Validate a PDF with the Windows PDF engine; list page sizes; optionally render one page to PNG.
+          nexora xpsinfo FILE.xps [--png OUT.png] [--page N] [--dpi N]
+              Read an XPS job (Nexora v4 driver): pages, sizes, copies, paper; optionally render a page to PNG.
+          nexora xpscapture --pipe NAME --queue PRINTER --out DIR
+              Receive jobs from a test queue whose port is \\.\pipe\NAME and save each one to DIR (driver tests).
           nexora queue                                    Show the state of the "{NexoraInfo.PrinterQueueName}" queue.
         """);
     return 64;
@@ -275,16 +282,66 @@ async Task<int> PrintAsync()
     var printer = Opt("--printer") ?? throw new InvalidOperationException("--printer NAME is required");
     var toFile = Opt("--to-file");
     var copies = int.Parse(Opt("--copies") ?? "1");
+    var method = Enum.Parse<XpsPrintMethod>(Opt("--method") ?? "Auto", ignoreCase: true);
     bool actual = Flag("--actual-size");
-    var file = argv.FirstOrDefault() ?? throw new InvalidOperationException("FILE.pdf is required");
-    var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
+    var file = argv.FirstOrDefault() ?? throw new InvalidOperationException("FILE.pdf or FILE.xps is required");
+    var outcome = await new DocumentPrinter().PrintAsync(new PrintRequest
     {
-        JobId = Guid.NewGuid(), PdfPath = Path.GetFullPath(file), DocumentName = Path.GetFileName(file), PrinterName = printer,
-        Settings = new PrintSettings { Copies = copies }, FitToPrintableArea = !actual,
+        JobId = Guid.NewGuid(), DocumentPath = Path.GetFullPath(file), DocumentName = Path.GetFileName(file), PrinterName = printer,
+        Settings = new PrintSettings { Copies = copies }, FitToPrintableArea = !actual, XpsMethod = method,
         PrintToFile = toFile is null ? null : Path.GetFullPath(toFile), TrackTimeout = TimeSpan.FromMinutes(2),
     }, (s, m) => Console.WriteLine($"  {s.ToWire()}: {m}"), CancellationToken.None);
     Console.WriteLine($"RESULT {outcome.State.ToWire()} {outcome.ErrorCode} {outcome.Message} (pages {outcome.PagesSent})");
     return outcome.State == JobState.Failed ? 4 : 0;
+}
+
+int XpsInfoCmd()
+{
+    var png = Opt("--png");
+    int page = int.Parse(Opt("--page") ?? "1") - 1;
+    int dpi = int.Parse(Opt("--dpi") ?? "72");
+    var file = Path.GetFullPath(argv.FirstOrDefault() ?? throw new InvalidOperationException("FILE.xps is required"));
+    var info = XpsInspector.Inspect(file, png, page, dpi);
+    if (info.Problem is not null) { Console.WriteLine($"Not a readable XPS document: {info.Problem}"); return 4; }
+    Console.WriteLine($"XPS: {info.PageCount} page(s), copies={info.Copies?.ToString() ?? "-"}, paper={info.MediaSize ?? "-"}, orientation={info.Orientation ?? "-"}");
+    for (int i = 0; i < info.Pages.Count; i++)
+    {
+        var p = info.Pages[i];
+        Console.WriteLine($"  page {i + 1}: {p.WidthMm:0} x {p.HeightMm:0} mm {(p.WidthMm > p.HeightMm ? "landscape" : "portrait")}");
+    }
+    if (png is not null) Console.WriteLine($"Rendered page {page + 1} at {dpi} dpi to {png}");
+    return 0;
+}
+
+async Task<int> XpsCaptureAsync()
+{
+    var pipe = Opt("--pipe") ?? throw new InvalidOperationException("--pipe NAME is required");
+    var queue = Opt("--queue") ?? throw new InvalidOperationException("--queue PRINTER is required");
+    var outDir = Directory.CreateDirectory(Opt("--out") ?? "xps-capture").FullName;
+    var log = new Log(null, "xpscapture") { WriteToConsole = true };
+    await using var server = new PipeCaptureServer(pipe, queue, Path.Combine(outDir, ".incoming"), 4L * 1024 * 1024 * 1024, job =>
+    {
+        // The capture server checks for PDF; XPS jobs arrive flagged "non-PDF", which is expected here.
+        var name = $"{DateTime.Now:yyyyMMdd_HHmmss}_{SafeFileName.Sanitize(job.DocumentName, 60)}";
+        bool xps = XpsInspector.LooksLikeXps(job.FilePath);
+        var target = Path.Combine(outDir, name + (xps ? ".xps" : ".bin"));
+        File.Move(job.FilePath, target, overwrite: true);
+        var size = new FileInfo(target).Length;
+        Console.WriteLine($"JOB '{job.DocumentName}' {size:N0} bytes -> {target} (format: {(xps ? "XPS" : "unknown")}, ticket copies={job.Settings.Copies}, paper={job.Settings.PaperSize}, orientation={job.Settings.Orientation})");
+        if (xps)
+        {
+            var info = XpsInspector.Inspect(target);
+            Console.WriteLine(info.Problem is null
+                ? $"    {info.PageCount} page(s): {string.Join(", ", info.Pages.Select(p => $"{p.WidthMm:0}x{p.HeightMm:0}mm"))}; PrintTicket copies={info.Copies}, paper={info.MediaSize}, orientation={info.Orientation}"
+                : $"    XPS could not be read: {info.Problem}");
+        }
+        return Task.CompletedTask;
+    }, log.For("capture"));
+    server.Start();
+    Console.WriteLine($"Listening on \\\\.\\pipe\\{pipe} for queue '{queue}'. Saving to {outDir}");
+    Console.WriteLine("READY");
+    await WaitForCtrlC();
+    return 0;
 }
 
 int PdfInfo()

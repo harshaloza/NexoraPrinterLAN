@@ -264,7 +264,10 @@ public sealed class ClientViewModel : ObservableObject
     private async Task RunQueueScript(string script)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "scripts", script);
-        int code = await Task.Run(() => QueueInspector.RunElevatedScript(path, "-NoPause"));
+        // Setup installs the signed Nexora driver package next to the app; without it the inbox PDF driver is used.
+        var driverDir = Path.Combine(AppContext.BaseDirectory, "driver");
+        var args = Directory.Exists(driverDir) ? $"-NoPause -DriverDir \"{driverDir}\"" : "-NoPause";
+        int code = await Task.Run(() => QueueInspector.RunElevatedScript(path, args));
         _queue = null;
         Refresh();
         if (code != 0) Dialogs.Error($"{script} exited with code {code}. See the PowerShell window output for details.");

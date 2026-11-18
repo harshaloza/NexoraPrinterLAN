@@ -8,7 +8,7 @@
     Binaries and the MSI are not code-signed unless -SignCertThumbprint is given (see docs\INSTALLATION.md, "Signing").
 #>
 param(
-    [string]$Version = '1.1.0',
+    [string]$Version = '1.2.0',
     [string]$SignCertThumbprint,
     [switch]$SkipTests
 )
@@ -50,6 +50,15 @@ $extra = Get-ChildItem "$payload\app" -File | Where-Object Name -notin 'NexoraPr
 if ($extra) { throw "Single-file publish left extra files the MSI does not install: $($extra.Name -join ', ')" }
 Sign @("$payload\app\NexoraPrinterLAN.exe", "$payload\cli\nexora.exe")
 
+# Nexora v4 printer driver: built and its catalog signed (local Nexora certificate unless -SignCertThumbprint is given).
+$driverArgs = @{}
+if ($SignCertThumbprint) { $driverArgs.CertThumbprint = $SignCertThumbprint }
+& (Join-Path $root 'driver\Build-DriverPackage.ps1') @driverArgs
+$driverDir = Join-Path $root 'artifacts\driver'
+if (-not (Test-Path "$driverDir\NexoraV4\nexoraprinterlan.cat")) { throw 'Driver package was not built' }
+# With a purchased (publicly trusted) certificate there is no .cer to ship: Windows already trusts it.
+$hasDriverCert = if (-not $SignCertThumbprint -and (Test-Path "$driverDir\NexoraDriverSigning.cer")) { 'yes' } else { 'no' }
+
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 $msi = Join-Path $release "NexoraPrinterLAN-$Version-x64.msi"
 Push-Location $msiDir
@@ -57,7 +66,7 @@ try {
     & wix build NexoraPrinterLAN.wxs -arch x64 `
         -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -ext WixToolset.Firewall.wixext `
         -d Version=$Version -d PayloadDir=$payload -d AssetsDir="$root\assets" -d ScriptsDir="$root\scripts" `
-        -d DocsDir="$root\docs" -d RootDir=$root -o $msi
+        -d DocsDir="$root\docs" -d RootDir=$root -d DriverDir=$driverDir -d HasDriverCert=$hasDriverCert -o $msi
     if ($LASTEXITCODE -ne 0) { throw "wix build failed ($LASTEXITCODE)" }
 }
 finally { Pop-Location }

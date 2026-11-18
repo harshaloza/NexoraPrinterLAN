@@ -146,6 +146,16 @@ public sealed class ReceiverViewModel : ObservableObject
     public bool ActualSize { get => _actualSize; set => Set(ref _actualSize, value); }
     public bool KeepPrintedCopies { get => _keepCopies; set => Set(ref _keepCopies, value); }
 
+    /// <summary>How XPS jobs (from the Nexora driver) are printed; PDF jobs always print as images.</summary>
+    public IReadOnlyList<KeyValuePair<XpsPrintMethod, string>> XpsMethods { get; } =
+    [
+        new(XpsPrintMethod.Auto, "Automatic — sharp vector printing, images if the printer driver refuses it"),
+        new(XpsPrintMethod.Vector, "Vector only (fail if the printer driver refuses it)"),
+        new(XpsPrintMethod.Raster, "Images only (like Nexora 1.1)"),
+    ];
+    private XpsPrintMethod _xpsMethod;
+    public XpsPrintMethod XpsMethod { get => _xpsMethod; set => Set(ref _xpsMethod, value); }
+
     public AsyncCommand ToggleRunning { get; }
     public RelayCommand CopyPairing { get; }
     public RelayCommand ShowPairing { get; }
@@ -250,7 +260,7 @@ public sealed class ReceiverViewModel : ObservableObject
         {
             var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
             {
-                JobId = Guid.NewGuid(), PdfPath = file, DocumentName = "Nexora test page", PrinterName = printer,
+                JobId = Guid.NewGuid(), DocumentPath = file, DocumentName = "Nexora test page", PrinterName = printer,
                 FitToPrintableArea = !_host.Config.Scaling.Equals(PrintScaling.ActualSize), MaxRenderDpi = _host.Config.MaxRenderDpi,
                 TrackTimeout = TimeSpan.FromMinutes(2),
             }, null, default);
@@ -277,6 +287,7 @@ public sealed class ReceiverViewModel : ObservableObject
         DiscoveryEnabled = c.DiscoveryEnabled;
         ActualSize = c.Scaling == PrintScaling.ActualSize;
         KeepPrintedCopies = c.KeepPrintedCopies;
+        XpsMethod = c.XpsPrintMethod;
     }
 
     private async Task DoSaveSettingsAsync()
@@ -297,6 +308,7 @@ public sealed class ReceiverViewModel : ObservableObject
                 c.DiscoveryEnabled = DiscoveryEnabled;
                 c.Scaling = ActualSize ? PrintScaling.ActualSize : PrintScaling.FitToPrintableArea;
                 c.KeepPrintedCopies = KeepPrintedCopies;
+                c.XpsPrintMethod = XpsMethod;
             });
             LoadSettings();
             Refresh();

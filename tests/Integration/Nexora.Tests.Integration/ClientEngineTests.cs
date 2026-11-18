@@ -142,7 +142,7 @@ public class ClientEngineTests(ITestOutputHelper output)
         File.WriteAllBytes(src, TestPdfBuilder.Build("Queue capture test", pages: 2, TestPdfBuilder.A3, landscape: true));
         var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
         {
-            JobId = Guid.NewGuid(), PdfPath = src, DocumentName = "itest-queue-capture", PrinterName = NexoraInfo.PrinterQueueName,
+            JobId = Guid.NewGuid(), DocumentPath = src, DocumentName = "itest-queue-capture", PrinterName = NexoraInfo.PrinterQueueName,
             TrackTimeout = TimeSpan.FromSeconds(30),
         }, null, default);
         Assert.Equal(JobState.Completed, outcome.State);
@@ -220,7 +220,7 @@ public class ClientEngineTests(ITestOutputHelper output)
         File.WriteAllBytes(src, TestPdfBuilder.Build("Print path", pages: 3, TestPdfBuilder.A4));
         var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
         {
-            JobId = Guid.NewGuid(), PdfPath = src, DocumentName = "itest-print-path", PrinterName = "Microsoft Print to PDF",
+            JobId = Guid.NewGuid(), DocumentPath = src, DocumentName = "itest-print-path", PrinterName = "Microsoft Print to PDF",
             PrintToFile = dst, TrackTimeout = TimeSpan.FromSeconds(30),
         }, null, default);
         Assert.Equal(JobState.Completed, outcome.State);

@@ -22,6 +22,8 @@ public sealed class ReceiverConfig
     public PrintScaling Scaling { get; set; } = PrintScaling.FitToPrintableArea;
     /// <summary>Keep the received PDF after it was printed. Off by default: the PDF is only the transport format.</summary>
     public bool KeepPrintedCopies { get; set; }
+    /// <summary>XPS jobs (Nexora driver): vector through the destination driver, falling back to images if that fails.</summary>
+    public Nexora.PrinterIntegration.XpsPrintMethod XpsPrintMethod { get; set; } = Nexora.PrinterIntegration.XpsPrintMethod.Auto;
     /// <summary>Upper bound on rendering resolution. The printer's own resolution is used when lower.</summary>
     public int MaxRenderDpi { get; set; } = 600;
 

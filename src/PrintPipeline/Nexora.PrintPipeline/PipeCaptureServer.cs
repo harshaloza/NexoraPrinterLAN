@@ -19,6 +19,8 @@ public sealed record CapturedJob
     public uint? SpoolerJobId { get; init; }
     public int? PageCount { get; init; }
     public PrintSettings Settings { get; init; } = new();
+    /// <summary>application/pdf (Microsoft Print To PDF queue) or application/vnd.ms-xpsdocument (Nexora v4 driver).</summary>
+    public string Format { get; init; } = NexoraInfo.PdfMediaType;
     public string? Problem { get; init; }
 }
 
@@ -162,13 +164,16 @@ public sealed class PipeCaptureServer : IAsyncDisposable
 
         var docName = string.IsNullOrWhiteSpace(job?.Document) ? "Untitled print job" : job!.Document!;
         string? problem = null;
+        string format = NexoraInfo.PdfMediaType;
         int? pages = job?.TotalPages > 0 ? (int)job.TotalPages : null;
         if (overflow) problem = $"Job is larger than the {_maxBytes / (1024 * 1024)} MB limit";
         else
         {
-            var inspection = PdfInspector.Inspect(path);
-            if (!inspection.IsPdf) problem = $"Queue produced non-PDF data ({inspection.Problem}). Check that the queue uses the '{NexoraInfo.SourceDriverName}' driver.";
-            pages = inspection.PageCount ?? pages;
+            var check = DocumentFormats.Detect(path);
+            format = check.Format ?? format;
+            if (check.Problem is not null)
+                problem = $"The queue produced data Nexora cannot send ({check.Problem}). The printer must use the 'Nexora Printer LAN' or '{NexoraInfo.SourceDriverName}' driver.";
+            pages = check.PageCount ?? pages;
         }
 
         _log.Info("capture.job", $"Captured '{docName}' ({total:N0} bytes{(pages is null ? "" : $", {pages} page(s)")})",
@@ -182,6 +187,7 @@ public sealed class PipeCaptureServer : IAsyncDisposable
             SpoolerJobId = job?.JobId,
             PageCount = pages,
             Settings = job?.Settings ?? new PrintSettings(),
+            Format = format,
             Problem = problem,
         });
     }

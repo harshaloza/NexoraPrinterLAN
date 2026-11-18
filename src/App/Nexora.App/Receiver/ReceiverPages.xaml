@@ -165,6 +165,8 @@
                         <CheckBox Content="Keep copies of printed jobs" IsChecked="{Binding KeepPrintedCopies}"/>
                         <TextBlock Style="{StaticResource Muted}" Margin="22,0,0,6" Text="Off: the document is deleted once Windows has sent it to the printer. Test-mode jobs are always kept."/>
                         <CheckBox Content="Print at actual size (default: shrink to printable area)" IsChecked="{Binding ActualSize}"/>
+                        <TextBlock Text="Printing jobs from the Nexora driver (XPS)" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding XpsMethods}" SelectedValuePath="Key" DisplayMemberPath="Value" SelectedValue="{Binding XpsMethod}" MinWidth="0"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
                             <StackPanel><TextBlock Text="Max render DPI" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding MaxDpi}" MinWidth="0"/></StackPanel>

@@ -3,7 +3,14 @@
     <RootNamespace>Nexora.PrinterIntegration</RootNamespace>
     <!-- System.Drawing.Printing (GDI print path through the destination printer's own driver). -->
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- XPS documents from the Nexora v4 driver (System.Windows.Xps / System.Printing). -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\Nexora.Shared\Nexora.Shared.csproj" />
     <ProjectReference Include="..\..\Transport\Nexora.Transport\Nexora.Transport.csproj" />
