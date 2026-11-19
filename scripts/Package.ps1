@@ -8,7 +8,7 @@
     Binaries and the MSI are not code-signed unless -SignCertThumbprint is given (see docs\INSTALLATION.md, "Signing").
 #>
 param(
-    [string]$Version = '1.2.0',
+    [string]$Version = '1.2.1',
     [string]$SignCertThumbprint,
     [switch]$SkipTests
 )

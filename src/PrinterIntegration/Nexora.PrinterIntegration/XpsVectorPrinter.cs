@@ -18,8 +18,8 @@ public sealed class VectorPrintException(string message, Exception inner) : Exce
 /// Vector print path for XPS jobs from the Nexora v4 driver: the pages are written with WPF's XpsDocumentWriter to the
 /// destination queue. For XPS-capable (v4) drivers Windows passes XPS on; for GDI (v3) drivers such as Canon CAPT,
 /// Windows converts the XPS to GDI drawing calls into that driver. Text and lines stay vectors (no 600-dpi bitmaps).
-/// Per page: the closest paper the printer has (±6 mm) and the page's orientation are requested; pages that are larger
-/// than the printer's printable area are shrunk to fit (or placed at actual size when FitToPrintableArea is off).
+/// Per page: the closest paper the printer has (±6 mm) and the page's orientation are requested, and the page is scaled
+/// as <see cref="PrintRequest.Scaling"/> says (by default 100% when it fits on the paper, else shrunk to the printable area).
 /// </summary>
 public sealed class XpsVectorPrinter
 {
@@ -31,9 +31,10 @@ public sealed class XpsVectorPrinter
             return new(JobState.Failed, ErrorCodes.PrinterUnavailable, $"Printer '{req.PrinterName}' is not installed on this PC", null, 0);
         string spoolName = SpoolTracker.SpoolName(req);
         int pages;
+        double minScale = 1;
         try
         {
-            pages = await RunSta(() => PrintBlocking(req, spoolName, ct));
+            pages = await RunSta(() => PrintBlocking(req, spoolName, k => minScale = k, ct));
         }
         catch (OperationCanceledException)
         {
@@ -43,11 +44,13 @@ public sealed class XpsVectorPrinter
         {
             throw new VectorPrintException($"Vector printing to '{req.PrinterName}' failed: {e.Message}", e);
         }
-        onState?.Invoke(JobState.SubmittedToPrinter, $"{pages} page(s) handed to the '{req.PrinterName}' driver (vector)");
-        return await SpoolTracker.TrackAsync(req, spoolName, pages, onState, ct);
+        string scale = PagePlacement.Describe(minScale);
+        onState?.Invoke(JobState.SubmittedToPrinter, $"{pages} page(s) handed to the '{req.PrinterName}' driver (vector), {scale}");
+        var outcome = await SpoolTracker.TrackAsync(req, spoolName, pages, onState, ct);
+        return outcome with { Message = $"{outcome.Message} ({scale})" };
     }
 
-    private static int PrintBlocking(PrintRequest req, string spoolName, CancellationToken ct)
+    private static int PrintBlocking(PrintRequest req, string spoolName, Action<double> minScale, CancellationToken ct)
     {
         string? temp = null;
         try
@@ -75,11 +78,12 @@ public sealed class XpsVectorPrinter
             if (req.Settings.ColorMode == ColorMode.Monochrome && caps.OutputColorCapability.Contains(OutputColor.Monochrome))
                 jobTicket.OutputColor = OutputColor.Monochrome;
 
-            var plans = PlanPages(queue, caps, jobTicket, source);
+            var plans = PlanPages(queue, caps, jobTicket, source, req.Scaling);
+            minScale(plans.Min(p => p.Placement.Scale));
             // Drivers that only read the job/document ticket should still get the first page's paper and orientation.
             jobTicket.PageMediaSize = plans[0].Ticket.PageMediaSize;
             jobTicket.PageOrientation = plans[0].Ticket.PageOrientation;
-            var paginator = new FittingPaginator(source, plans, req.FitToPrintableArea);
+            var paginator = new FittingPaginator(source, plans);
 
             queue.CurrentJobSettings.Description = spoolName;
             var writer = PrintQueue.CreateXpsDocumentWriter(queue);
@@ -104,9 +108,9 @@ public sealed class XpsVectorPrinter
         }
     }
 
-    internal sealed record PagePlan(Size PaperSize, Rect Imageable, bool Landscape, Size ContentSize, PrintTicket Ticket);
+    internal sealed record PagePlan(Size PaperSize, Rect Imageable, bool Landscape, Size ContentSize, PrintTicket Ticket, PagePlacement Placement);
 
-    private static List<PagePlan> PlanPages(PrintQueue queue, PrintCapabilities caps, PrintTicket jobTicket, DocumentPaginator source)
+    private static List<PagePlan> PlanPages(PrintQueue queue, PrintCapabilities caps, PrintTicket jobTicket, DocumentPaginator source, PrintScaling scaling)
     {
         var media = caps.PageMediaSizeCapability.Where(m => m.Width is > 0 && m.Height is > 0).ToList();
         var defaultMedia = jobTicket.PageMediaSize;
@@ -145,7 +149,10 @@ public sealed class XpsVectorPrinter
             // Capabilities describe the imageable area in portrait; turn it with the page.
             if (landscape && imageable.Width < imageable.Height)
                 imageable = new Rect(imageable.Y, imageable.X, imageable.Height, imageable.Width);
-            plans.Add(new PagePlan(paper, imageable, landscape, size, ticket));
+            // XPS page coordinates start at the paper's corner, so the placement is used as computed.
+            var placement = PagePlacement.Compute(scaling, size.Width, size.Height, paper.Width, paper.Height,
+                imageable.X, imageable.Y, imageable.Width, imageable.Height);
+            plans.Add(new PagePlan(paper, imageable, landscape, size, ticket, placement));
         }
         if (plans.Count == 0) throw new InvalidDataException("The XPS document has no pages");
         return plans;
@@ -161,8 +168,8 @@ public sealed class XpsVectorPrinter
         return local.GetPrintQueue(name);
     }
 
-    /// <summary>Wraps the source pages: each is placed on its chosen paper, shrunk into the imageable area when needed.</summary>
-    private sealed class FittingPaginator(DocumentPaginator source, List<PagePlan> plans, bool fit) : DocumentPaginator
+    /// <summary>Wraps the source pages: each is placed on its chosen paper as its plan's placement says.</summary>
+    private sealed class FittingPaginator(DocumentPaginator source, List<PagePlan> plans) : DocumentPaginator
     {
         public override DocumentPage GetPage(int pageNumber)
         {
@@ -171,14 +178,12 @@ public sealed class XpsVectorPrinter
             var page = source.GetPage(pageNumber);
             var container = new ContainerVisual();
             container.Children.Add(page.Visual);
-            if (fit)
+            var p = plan.Placement;
+            if (p.Scale != 1 || p.X != 0 || p.Y != 0)
             {
-                var area = plan.Imageable;
-                double k = Math.Min(1, Math.Min(area.Width / plan.ContentSize.Width, area.Height / plan.ContentSize.Height));
-                double w = plan.ContentSize.Width * k, h = plan.ContentSize.Height * k;
                 var t = new TransformGroup();
-                t.Children.Add(new ScaleTransform(k, k));
-                t.Children.Add(new TranslateTransform(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
+                t.Children.Add(new ScaleTransform(p.Scale, p.Scale));
+                t.Children.Add(new TranslateTransform(p.X, p.Y));
                 container.Transform = t;
             }
             var box = new Rect(plan.PaperSize);

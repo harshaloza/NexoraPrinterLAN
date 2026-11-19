@@ -1,5 +1,18 @@
 # Nexora Printer LAN — Test report
 
+## 1.2.1: true-scale printing (2026-11-19, PC1)
+
+Reported by the user: printing from PC1 to PC2's Canon works, including AutoCAD 2007, but 1:1 plots came out
+undersized. Cause: the receiver's default *fit to printable area* shrank full-size pages into the Canon's hard margins
+(≈96% on A4). Automated: **85/85 unit, 25/25 integration passed** (Release, SDK 10.0.404).
+
+| Test | Result |
+|---|---|
+| Placement: full-size A4 page → 100% at the paper corner; smaller page → 100% centred; ±0.5% rounding tolerated; A3 on A4 → shrunk into the printable area, centred; *fit* → ≈96%; *actual size* never moves or scales | Passed (unit) |
+| Settings upgrade: 1.2.0 config with the old default *fit* → *auto*; *actual size* kept; *fit* chosen after the upgrade kept; new config defaults to *auto* | Passed (unit) |
+| Existing vector and raster print tests with the new default | Passed (integration) |
+| AutoCAD 2007 1:1 plot measured on the Canon LBP2900 with 1.2.1 | **Not tested** — needs PC2 |
+
 ## 1.2 development: own v4 driver + XPS without PDF (2026-11-06, PC1, branch `feature/nexora-v4-driver`)
 
 Automated: **71/71 unit, 25/25 integration passed** (Debug). New: format detection, XPS piece re-assembly, XPS transfer,

@@ -33,6 +33,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Paths = paths;
         _configStore = new ConfigStore<ReceiverConfig>(paths.ConfigFile);
         _cfg = _configStore.Load();
+        _cfg.Upgrade(); // saved below
         _cfg.Validate();
         _key = _cfg.GetOrCreatePairingKey(out bool created);
         PairingCodeWasCreated = created;

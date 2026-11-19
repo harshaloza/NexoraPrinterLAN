@@ -19,5 +19,6 @@
     <ProjectReference Include="..\..\..\src\Discovery\Nexora.Discovery\Nexora.Discovery.csproj" />
     <ProjectReference Include="..\..\..\src\Client\Nexora.Client.Core\Nexora.Client.Core.csproj" />
     <ProjectReference Include="..\..\..\src\PrinterIntegration\Nexora.PrinterIntegration\Nexora.PrinterIntegration.csproj" />
+    <ProjectReference Include="..\..\..\src\Receiver\Nexora.Receiver.Core\Nexora.Receiver.Core.csproj" />
   </ItemGroup>
 </Project>

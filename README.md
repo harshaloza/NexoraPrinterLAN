@@ -22,8 +22,9 @@ installed. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Status
 
-Version 1.2.0 adds Nexora's own printer driver and XPS printing without PDF (verified on PC1; the Canon test with
-1.2 is pending — see TEST_REPORT). Version 1.1.0 verified: queue creation and capture from Notepad, Word, Excel and GDI apps; encrypted, resumable
+Version 1.2.0 adds Nexora's own printer driver and XPS printing without PDF. Version 1.2.1 prints pages at true scale
+(100%, e.g. 1:1 CAD plots) instead of shrinking them into the printer's margins; the Canon check of 1.2.1 is pending —
+see TEST_REPORT. Version 1.1.0 verified: queue creation and capture from Notepad, Word, Excel and GDI apps; encrypted, resumable
 transfer; **PC1 → PC2 over Wi-Fi with automatic discovery** and a **physical page on the Canon LBP2900** (1.0.1);
 the combined app; Setup install, upgrade from 1.0.x, role add/remove, uninstall and reinstall on PC1.
 **Not yet verified:** 1.1.0 on PC2, multi-page/landscape/copies on the Canon, CAD applications (NX, AutoCAD,
@@ -31,7 +32,7 @@ SolidWorks). See [docs/TEST_REPORT.md](docs/TEST_REPORT.md) and [DEVELOPMENT_STA
 
 ## Quick start
 
-1. Build Setup: `.\scripts\Package.ps1` → `release\NexoraPrinterLAN-1.2.0-x64.msi`.
+1. Build Setup: `.\scripts\Package.ps1` → `release\NexoraPrinterLAN-1.2.1-x64.msi`.
 2. **PC2** (printer PC): run the MSI, choose **Receive and print on this PC**, note the pairing code.
 3. **PC1** (printing PC): run the same MSI (default **Print to another PC**), enter the pairing code in Settings.
 4. Print to **Nexora Printer LAN** from any application. Uninstall from Apps & features.

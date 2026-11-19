@@ -133,7 +133,7 @@ public sealed class ReceiverViewModel : ObservableObject
 
     // ----------------------------------------------------------- settings
     private string _name = "", _tcp = "", _udp = "", _bind = "", _allowed = "", _maxMb = "", _retention = "", _dpi = "";
-    private bool _discovery, _actualSize, _keepCopies;
+    private bool _discovery, _keepCopies;
     public string ReceiverName { get => _name; set => Set(ref _name, value); }
     public string TcpPort { get => _tcp; set => Set(ref _tcp, value); }
     public string UdpPort { get => _udp; set => Set(ref _udp, value); }
@@ -143,7 +143,6 @@ public sealed class ReceiverViewModel : ObservableObject
     public string RetentionDays { get => _retention; set => Set(ref _retention, value); }
     public string MaxDpi { get => _dpi; set => Set(ref _dpi, value); }
     public bool DiscoveryEnabled { get => _discovery; set => Set(ref _discovery, value); }
-    public bool ActualSize { get => _actualSize; set => Set(ref _actualSize, value); }
     public bool KeepPrintedCopies { get => _keepCopies; set => Set(ref _keepCopies, value); }
 
     /// <summary>How XPS jobs (from the Nexora driver) are printed; PDF jobs always print as images.</summary>
@@ -153,6 +152,16 @@ public sealed class ReceiverViewModel : ObservableObject
         new(XpsPrintMethod.Vector, "Vector only (fail if the printer driver refuses it)"),
         new(XpsPrintMethod.Raster, "Images only (like Nexora 1.1)"),
     ];
+    /// <summary>How pages are scaled onto the destination printer's paper.</summary>
+    public IReadOnlyList<KeyValuePair<PrintScaling, string>> ScalingModes { get; } =
+    [
+        new(PrintScaling.Auto, "True scale (100%) — shrink only pages larger than the paper"),
+        new(PrintScaling.ActualSize, "Always 100%, never shrink (larger pages are cut off)"),
+        new(PrintScaling.FitToPrintableArea, "Shrink to fit inside the printer's margins (not to scale)"),
+    ];
+    private PrintScaling _scaling;
+    public PrintScaling Scaling { get => _scaling; set => Set(ref _scaling, value); }
+
     private XpsPrintMethod _xpsMethod;
     public XpsPrintMethod XpsMethod { get => _xpsMethod; set => Set(ref _xpsMethod, value); }
 
@@ -261,7 +270,7 @@ public sealed class ReceiverViewModel : ObservableObject
             var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
             {
                 JobId = Guid.NewGuid(), DocumentPath = file, DocumentName = "Nexora test page", PrinterName = printer,
-                FitToPrintableArea = !_host.Config.Scaling.Equals(PrintScaling.ActualSize), MaxRenderDpi = _host.Config.MaxRenderDpi,
+                Scaling = _host.Config.Scaling, MaxRenderDpi = _host.Config.MaxRenderDpi,
                 TrackTimeout = TimeSpan.FromMinutes(2),
             }, null, default);
             _host.Log.For("ui").Info("print.testpage", $"Test page on '{printer}': {outcome.State.ToWire()} {outcome.Message}");
@@ -285,7 +294,7 @@ public sealed class ReceiverViewModel : ObservableObject
         RetentionDays = c.JobRetentionDays.ToString();
         MaxDpi = c.MaxRenderDpi.ToString();
         DiscoveryEnabled = c.DiscoveryEnabled;
-        ActualSize = c.Scaling == PrintScaling.ActualSize;
+        Scaling = c.Scaling;
         KeepPrintedCopies = c.KeepPrintedCopies;
         XpsMethod = c.XpsPrintMethod;
     }
@@ -306,7 +315,7 @@ public sealed class ReceiverViewModel : ObservableObject
                 c.JobRetentionDays = Math.Max(1, int.Parse(RetentionDays));
                 c.MaxRenderDpi = int.Parse(MaxDpi);
                 c.DiscoveryEnabled = DiscoveryEnabled;
-                c.Scaling = ActualSize ? PrintScaling.ActualSize : PrintScaling.FitToPrintableArea;
+                c.Scaling = Scaling;
                 c.KeepPrintedCopies = KeepPrintedCopies;
                 c.XpsPrintMethod = XpsMethod;
             });
