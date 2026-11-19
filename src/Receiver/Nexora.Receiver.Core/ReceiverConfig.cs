@@ -1,13 +1,17 @@
+using Nexora.PrinterIntegration;
 using Nexora.Shared;
 using Nexora.Shared.Security;
 
 namespace Nexora.Receiver.Core;
 
-public enum PrintScaling { FitToPrintableArea, ActualSize }
-
 /// <summary>Receiver settings, stored as JSON in %LOCALAPPDATA%\Nexora\Receiver\config.json.</summary>
 public sealed class ReceiverConfig
 {
+    /// <summary>Version of the settings layout; <see cref="Upgrade"/> brings older files up to <see cref="CurrentSettingsVersion"/>.</summary>
+    public const int CurrentSettingsVersion = 2;
+    /// <summary>0 = written by Nexora 1.2.0 or earlier (the field did not exist).</summary>
+    public int SettingsVersion { get; set; }
+
     public string ReceiverId { get; set; } = Guid.NewGuid().ToString("N");
     public string ReceiverName { get; set; } = Environment.MachineName;
     public int DiscoveryPort { get; set; } = NexoraInfo.DefaultDiscoveryPort;
@@ -19,7 +23,8 @@ public sealed class ReceiverConfig
     /// <summary>Test mode saves jobs only. It is the default until a destination printer is chosen and test mode is turned off.</summary>
     public bool TestMode { get; set; } = true;
     public string? DestinationPrinter { get; set; }
-    public PrintScaling Scaling { get; set; } = PrintScaling.FitToPrintableArea;
+    /// <summary>Default Auto: true scale (100%) when the page fits on the paper, shrink only pages that are larger.</summary>
+    public PrintScaling Scaling { get; set; } = PrintScaling.Auto;
     /// <summary>Keep the received PDF after it was printed. Off by default: the PDF is only the transport format.</summary>
     public bool KeepPrintedCopies { get; set; }
     /// <summary>XPS jobs (Nexora driver): vector through the destination driver, falling back to images if that fails.</summary>
@@ -58,8 +63,22 @@ public sealed class ReceiverConfig
 
     public void SetPairingKey(PairingKey key) => ProtectedPairingCode = SecretProtector.Protect(key.Code);
 
+    /// <summary>
+    /// Brings settings written by an older version up to date. Returns true when something changed (the caller saves).
+    /// Version 2: Nexora 1.2.0 and earlier always stored the then-default "fit to printable area", which shrank full-size
+    /// pages (e.g. CAD plots at 1:1) by a few percent; those move to the new default Auto. "Actual size" is kept.
+    /// </summary>
+    public bool Upgrade()
+    {
+        if (SettingsVersion >= CurrentSettingsVersion) return false;
+        if (SettingsVersion < 2 && Scaling == PrintScaling.FitToPrintableArea) Scaling = PrintScaling.Auto;
+        SettingsVersion = CurrentSettingsVersion;
+        return true;
+    }
+
     public void Validate()
     {
+        if (!Enum.IsDefined(Scaling)) throw new InvalidOperationException($"Unknown print scaling '{Scaling}'");
         if (DiscoveryPort is < 1 or > 65535 || TransportPort is < 1 or > 65535) throw new InvalidOperationException("Ports must be 1-65535");
         if (DiscoveryPort == TransportPort) throw new InvalidOperationException("Discovery and transport ports must differ");
         if (MaxJobBytes is < 1024 or > 4L * 1024 * 1024 * 1024) throw new InvalidOperationException("Max job size must be between 1 KB and 4 GB");

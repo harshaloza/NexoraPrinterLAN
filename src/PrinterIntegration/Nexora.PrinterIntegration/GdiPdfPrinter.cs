@@ -23,7 +23,7 @@ public sealed record PrintRequest
     public required string DocumentName { get; init; }
     public required string PrinterName { get; init; }
     public PrintSettings Settings { get; init; } = new();
-    public bool FitToPrintableArea { get; init; } = true;
+    public PrintScaling Scaling { get; init; } = PrintScaling.Auto;
     public int MaxRenderDpi { get; init; } = 600;
     public XpsPrintMethod XpsMethod { get; init; } = XpsPrintMethod.Auto;
     /// <summary>Test hook: print through the driver into this file instead of the device port (raster path only).</summary>
@@ -53,10 +53,11 @@ public sealed class GdiPdfPrinter
 
         string spoolName = SpoolTracker.SpoolName(req);
         int pagesSent = 0;
+        double minScale = 1;
 
         try
         {
-            await Task.Run(() => pagesSent = PrintBlocking(req, settings, spoolName, ct), ct);
+            await Task.Run(() => pagesSent = PrintBlocking(req, settings, spoolName, k => minScale = Math.Min(minScale, k), ct), ct);
         }
         catch (OperationCanceledException)
         {
@@ -67,11 +68,13 @@ public sealed class GdiPdfPrinter
             return new(JobState.Failed, ErrorCodes.PrintFailed, $"Printing failed: {e.Message}", null, pagesSent);
         }
 
-        onState?.Invoke(JobState.SubmittedToPrinter, $"{pagesSent} page(s) handed to the '{req.PrinterName}' driver");
-        return await SpoolTracker.TrackAsync(req, spoolName, pagesSent, onState, ct);
+        string scale = PagePlacement.Describe(minScale);
+        onState?.Invoke(JobState.SubmittedToPrinter, $"{pagesSent} page(s) handed to the '{req.PrinterName}' driver, {scale}");
+        var outcome = await SpoolTracker.TrackAsync(req, spoolName, pagesSent, onState, ct);
+        return outcome with { Message = $"{outcome.Message} ({scale})" };
     }
 
-    private static int PrintBlocking(PrintRequest req, PrinterSettings settings, string spoolName, CancellationToken ct)
+    private static int PrintBlocking(PrintRequest req, PrinterSettings settings, string spoolName, Action<double> scaleUsed, CancellationToken ct)
     {
         using var src = PageSources.Open(req.DocumentPath);
         if (src.PageCount == 0) throw new IOException("The document has no pages");
@@ -112,22 +115,15 @@ public sealed class GdiPdfPrinter
             int deviceDpi = (int)Math.Max(g.DpiX, 72);
             using var bmp = src.Render(page, Math.Min(deviceDpi, req.MaxRenderDpi));
 
-            // Graphics units are 1/100 inch with origin at the printable-area corner.
+            // Graphics units are 1/100 inch with the origin at the printable-area corner, which sits at the hard margin
+            // from the paper's corner. Placement is computed in paper coordinates, then shifted by the hard margin.
             var printable = g.VisibleClipBounds;
+            float hmX = e.PageSettings.HardMarginX, hmY = e.PageSettings.HardMarginY;
             float pageW = sizePt.Width / 72f * 100f, pageH = sizePt.Height / 72f * 100f;
-            RectangleF dest;
-            if (req.FitToPrintableArea)
-            {
-                // Shrink (never enlarge) so the whole sheet fits inside the printer's hard margins.
-                float k = Math.Min(1f, Math.Min(printable.Width / pageW, printable.Height / pageH));
-                float w = pageW * k, h = pageH * k;
-                dest = new RectangleF(printable.X + (printable.Width - w) / 2, printable.Y + (printable.Height - h) / 2, w, h);
-            }
-            else
-            {
-                // Actual size: place the sheet at the physical page origin (compensate the hard margin).
-                dest = new RectangleF(-e.PageSettings.HardMarginX, -e.PageSettings.HardMarginY, pageW, pageH);
-            }
+            var place = PagePlacement.Compute(req.Scaling, pageW, pageH, e.PageBounds.Width, e.PageBounds.Height,
+                hmX + printable.X, hmY + printable.Y, printable.Width, printable.Height);
+            scaleUsed(place.Scale);
+            var dest = new RectangleF((float)place.X - hmX, (float)place.Y - hmY, (float)(pageW * place.Scale), (float)(pageH * place.Scale));
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.DrawImage(bmp, dest);

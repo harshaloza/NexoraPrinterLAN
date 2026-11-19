@@ -164,7 +164,9 @@
                         <TextBlock Text="Printing and storage" Style="{StaticResource H2}"/>
                         <CheckBox Content="Keep copies of printed jobs" IsChecked="{Binding KeepPrintedCopies}"/>
                         <TextBlock Style="{StaticResource Muted}" Margin="22,0,0,6" Text="Off: the document is deleted once Windows has sent it to the printer. Test-mode jobs are always kept."/>
-                        <CheckBox Content="Print at actual size (default: shrink to printable area)" IsChecked="{Binding ActualSize}"/>
+                        <TextBlock Text="Page size on the printer" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding ScalingModes}" SelectedValuePath="Key" DisplayMemberPath="Value" SelectedValue="{Binding Scaling}" MinWidth="0"/>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,6" Text="At 100%, drawings keep their scale (1:1 CAD plots measure true), but the printer cannot print in its 4–5 mm edge margins, so content there is cut off."/>
                         <TextBlock Text="Printing jobs from the Nexora driver (XPS)" Style="{StaticResource FieldLabel}"/>
                         <ComboBox ItemsSource="{Binding XpsMethods}" SelectedValuePath="Key" DisplayMemberPath="Value" SelectedValue="{Binding XpsMethod}" MinWidth="0"/>
                         <Grid>

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.1 — 2026-11-19
+
+### Fixed
+- **1:1 plots (e.g. AutoCAD) printed a few percent too small.** The receiver shrank every full-size page to fit inside
+  the destination printer's hard margins (about 96% on an A4 laser printer). The new default prints pages at true
+  scale (100%) when they fit on the paper, and only shrinks pages larger than the paper. Content in the printer's
+  4–5 mm edge margins is cut off instead of the page being scaled.
+
+### Changed
+- Receiver Settings: *Page size on the printer* replaces the *Print at actual size* checkbox, with three choices:
+  true scale (default), always 100%, or shrink to fit the margins. Receivers upgraded from 1.2.0 or earlier that used
+  the old default move to true scale; *actual size* is kept.
+- Each printed job's status says the scale used, e.g. "printed at 100% (actual size)" or "shrunk to 71% to fit…".
+- CLI: `print --scaling auto|actualsize|fittoprintablearea` (and `--fit`); `--actual-size` still works.
+- Licensed under MIT; Setup's license page shows it.
+
 ## 1.2.0 — 2026-11-07
 
 ### Added
