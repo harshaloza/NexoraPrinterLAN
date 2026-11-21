@@ -44,7 +44,7 @@ public sealed class XpsVectorPrinter
         {
             throw new VectorPrintException($"Vector printing to '{req.PrinterName}' failed: {e.Message}", e);
         }
-        string scale = PagePlacement.Describe(minScale);
+        string scale = PagePlacement.Describe(minScale, req.Calibration);
         onState?.Invoke(JobState.SubmittedToPrinter, $"{pages} page(s) handed to the '{req.PrinterName}' driver (vector), {scale}");
         var outcome = await SpoolTracker.TrackAsync(req, spoolName, pages, onState, ct);
         return outcome with { Message = $"{outcome.Message} ({scale})" };
@@ -78,7 +78,7 @@ public sealed class XpsVectorPrinter
             if (req.Settings.ColorMode == ColorMode.Monochrome && caps.OutputColorCapability.Contains(OutputColor.Monochrome))
                 jobTicket.OutputColor = OutputColor.Monochrome;
 
-            var plans = PlanPages(queue, caps, jobTicket, source, req.Scaling);
+            var plans = PlanPages(queue, caps, jobTicket, source, req.Scaling, req.Calibration);
             minScale(plans.Min(p => p.Placement.Scale));
             // Drivers that only read the job/document ticket should still get the first page's paper and orientation.
             jobTicket.PageMediaSize = plans[0].Ticket.PageMediaSize;
@@ -110,7 +110,7 @@ public sealed class XpsVectorPrinter
 
     internal sealed record PagePlan(Size PaperSize, Rect Imageable, bool Landscape, Size ContentSize, PrintTicket Ticket, PagePlacement Placement);
 
-    private static List<PagePlan> PlanPages(PrintQueue queue, PrintCapabilities caps, PrintTicket jobTicket, DocumentPaginator source, PrintScaling scaling)
+    private static List<PagePlan> PlanPages(PrintQueue queue, PrintCapabilities caps, PrintTicket jobTicket, DocumentPaginator source, PrintScaling scaling, PrintCalibration? calibration)
     {
         var media = caps.PageMediaSizeCapability.Where(m => m.Width is > 0 && m.Height is > 0).ToList();
         var defaultMedia = jobTicket.PageMediaSize;
@@ -151,7 +151,7 @@ public sealed class XpsVectorPrinter
                 imageable = new Rect(imageable.Y, imageable.X, imageable.Height, imageable.Width);
             // XPS page coordinates start at the paper's corner, so the placement is used as computed.
             var placement = PagePlacement.Compute(scaling, size.Width, size.Height, paper.Width, paper.Height,
-                imageable.X, imageable.Y, imageable.Width, imageable.Height);
+                imageable.X, imageable.Y, imageable.Width, imageable.Height).Calibrate(calibration, landscape);
             plans.Add(new PagePlan(paper, imageable, landscape, size, ticket, placement));
         }
         if (plans.Count == 0) throw new InvalidDataException("The XPS document has no pages");
@@ -179,10 +179,10 @@ public sealed class XpsVectorPrinter
             var container = new ContainerVisual();
             container.Children.Add(page.Visual);
             var p = plan.Placement;
-            if (p.Scale != 1 || p.X != 0 || p.Y != 0)
+            if (p.ScaleX != 1 || p.ScaleY != 1 || p.X != 0 || p.Y != 0)
             {
                 var t = new TransformGroup();
-                t.Children.Add(new ScaleTransform(p.Scale, p.Scale));
+                t.Children.Add(new ScaleTransform(p.ScaleX, p.ScaleY));
                 t.Children.Add(new TranslateTransform(p.X, p.Y));
                 container.Transform = t;
             }

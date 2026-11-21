@@ -81,7 +81,7 @@ int Usage()
           nexora status JOBID --key CODE [--to HOST[:PORT]]
           nexora testpdf OUT.pdf [--pages N] [--size A4|A3|Letter] [--landscape] [--mb N]
           nexora pairing [--data DIR] [--regenerate]     Show (or regenerate) the receiver pairing code.
-          nexora print FILE.pdf|FILE.xps --printer NAME [--to-file OUT] [--scaling auto|actualsize|fittoprintablearea | --actual-size | --fit] [--copies N] [--method auto|vector|raster]
+          nexora print FILE.pdf|FILE.xps --printer NAME [--to-file OUT] [--scaling auto|actualsize|fittoprintablearea | --actual-size | --fit] [--calibration ACROSS%,ALONG%] [--copies N] [--method auto|vector|raster]
               Print locally through a Windows printer driver (receiver print path test). XPS defaults to vector with
               raster fallback; --to-file applies to the raster path only.
           nexora printers                                 List installed printers and their real status.
@@ -287,11 +287,19 @@ async Task<int> PrintAsync()
     var scaling = Flag("--actual-size") ? PrintScaling.ActualSize
         : Flag("--fit") ? PrintScaling.FitToPrintableArea
         : Enum.Parse<PrintScaling>(Opt("--scaling") ?? "Auto", ignoreCase: true);
+    PrintCalibration? calibration = null;
+    if (Opt("--calibration") is { } calText)
+    {
+        var parts = calText.Split(',', 'x', 'X');
+        if (parts.Length != 2) throw new InvalidOperationException("--calibration ACROSS,ALONG (percent, e.g. 100,100.8)");
+        calibration = new PrintCalibration(double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture), double.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture));
+        calibration.Validate();
+    }
     var file = argv.FirstOrDefault() ?? throw new InvalidOperationException("FILE.pdf or FILE.xps is required");
     var outcome = await new DocumentPrinter().PrintAsync(new PrintRequest
     {
         JobId = Guid.NewGuid(), DocumentPath = Path.GetFullPath(file), DocumentName = Path.GetFileName(file), PrinterName = printer,
-        Settings = new PrintSettings { Copies = copies }, Scaling = scaling, XpsMethod = method,
+        Settings = new PrintSettings { Copies = copies }, Scaling = scaling, Calibration = calibration, XpsMethod = method,
         PrintToFile = toFile is null ? null : Path.GetFullPath(toFile), TrackTimeout = TimeSpan.FromMinutes(2),
     }, (s, m) => Console.WriteLine($"  {s.ToWire()}: {m}"), CancellationToken.None);
     Console.WriteLine($"RESULT {outcome.State.ToWire()} {outcome.ErrorCode} {outcome.Message} (pages {outcome.PagesSent})");

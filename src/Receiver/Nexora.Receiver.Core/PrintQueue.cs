@@ -125,6 +125,7 @@ public sealed class PrintQueue : IAsyncDisposable
                     PrinterName = printer,
                     Settings = r.Metadata.Settings,
                     Scaling = cfg.Scaling,
+                    Calibration = cfg.CalibrationFor(printer),
                     MaxRenderDpi = cfg.MaxRenderDpi,
                     XpsMethod = cfg.XpsPrintMethod,
                     PrintToFile = TestPrintToFile?.Invoke(id),
