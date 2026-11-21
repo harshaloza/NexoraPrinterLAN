@@ -24,6 +24,8 @@ public sealed record PrintRequest
     public required string PrinterName { get; init; }
     public PrintSettings Settings { get; init; } = new();
     public PrintScaling Scaling { get; init; } = PrintScaling.Auto;
+    /// <summary>Size correction for the destination printer; null = none.</summary>
+    public PrintCalibration? Calibration { get; init; }
     public int MaxRenderDpi { get; init; } = 600;
     public XpsPrintMethod XpsMethod { get; init; } = XpsPrintMethod.Auto;
     /// <summary>Test hook: print through the driver into this file instead of the device port (raster path only).</summary>
@@ -68,7 +70,7 @@ public sealed class GdiPdfPrinter
             return new(JobState.Failed, ErrorCodes.PrintFailed, $"Printing failed: {e.Message}", null, pagesSent);
         }
 
-        string scale = PagePlacement.Describe(minScale);
+        string scale = PagePlacement.Describe(minScale, req.Calibration);
         onState?.Invoke(JobState.SubmittedToPrinter, $"{pagesSent} page(s) handed to the '{req.PrinterName}' driver, {scale}");
         var outcome = await SpoolTracker.TrackAsync(req, spoolName, pagesSent, onState, ct);
         return outcome with { Message = $"{outcome.Message} ({scale})" };
@@ -123,7 +125,8 @@ public sealed class GdiPdfPrinter
             var place = PagePlacement.Compute(req.Scaling, pageW, pageH, e.PageBounds.Width, e.PageBounds.Height,
                 hmX + printable.X, hmY + printable.Y, printable.Width, printable.Height);
             scaleUsed(place.Scale);
-            var dest = new RectangleF((float)place.X - hmX, (float)place.Y - hmY, (float)(pageW * place.Scale), (float)(pageH * place.Scale));
+            place = place.Calibrate(req.Calibration, e.PageSettings.Landscape);
+            var dest = new RectangleF((float)place.X - hmX, (float)place.Y - hmY, (float)(pageW * place.ScaleX), (float)(pageH * place.ScaleY));
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.DrawImage(bmp, dest);

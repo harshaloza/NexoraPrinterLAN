@@ -25,6 +25,28 @@ public sealed class ReceiverConfig
     public string? DestinationPrinter { get; set; }
     /// <summary>Default Auto: true scale (100%) when the page fits on the paper, shrink only pages that are larger.</summary>
     public PrintScaling Scaling { get; set; } = PrintScaling.Auto;
+    /// <summary>Size calibration per destination printer name (e.g. a laser printer that prints 0.8% short along the feed).</summary>
+    public Dictionary<string, PrintCalibration> Calibrations { get; set; } = [];
+
+    /// <summary>The calibration for a printer, or null when none is set.</summary>
+    public PrintCalibration? CalibrationFor(string? printer)
+    {
+        if (printer is null) return null;
+        var hit = Calibrations.FirstOrDefault(kv => string.Equals(kv.Key, printer, StringComparison.OrdinalIgnoreCase)).Value;
+        return hit is null || hit.IsNone ? null : hit;
+    }
+
+    /// <summary>Sets (or with null / 100% × 100%, removes) a printer's calibration.</summary>
+    public void SetCalibration(string printer, PrintCalibration? calibration)
+    {
+        foreach (var key in Calibrations.Keys.Where(k => string.Equals(k, printer, StringComparison.OrdinalIgnoreCase)).ToList())
+            Calibrations.Remove(key);
+        if (calibration is not null && !calibration.IsNone)
+        {
+            calibration.Validate();
+            Calibrations[printer] = calibration;
+        }
+    }
     /// <summary>Keep the received PDF after it was printed. Off by default: the PDF is only the transport format.</summary>
     public bool KeepPrintedCopies { get; set; }
     /// <summary>XPS jobs (Nexora driver): vector through the destination driver, falling back to images if that fails.</summary>
@@ -79,6 +101,8 @@ public sealed class ReceiverConfig
     public void Validate()
     {
         if (!Enum.IsDefined(Scaling)) throw new InvalidOperationException($"Unknown print scaling '{Scaling}'");
+        Calibrations ??= [];
+        foreach (var c in Calibrations.Values) c.Validate();
         if (DiscoveryPort is < 1 or > 65535 || TransportPort is < 1 or > 65535) throw new InvalidOperationException("Ports must be 1-65535");
         if (DiscoveryPort == TransportPort) throw new InvalidOperationException("Discovery and transport ports must differ");
         if (MaxJobBytes is < 1024 or > 4L * 1024 * 1024 * 1024) throw new InvalidOperationException("Max job size must be between 1 KB and 4 GB");

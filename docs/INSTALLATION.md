@@ -26,7 +26,7 @@ A PC can have both roles. Requirements: Windows 10 2004 (build 19041) or newer, 
 
 Command line (PowerShell as Administrator on PC2):
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.2.1-x64.msi ADDLOCAL=Receiver /qb
+msiexec /i .\NexoraPrinterLAN-1.2.2-x64.msi ADDLOCAL=Receiver /qb
 ```
 
 ## 2. Install on the PC you print from (PC1)
@@ -40,7 +40,7 @@ msiexec /i .\NexoraPrinterLAN-1.2.1-x64.msi ADDLOCAL=Receiver /qb
 
 Command line (PowerShell as Administrator on PC1):
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.2.1-x64.msi ADDLOCAL=Client /qb
+msiexec /i .\NexoraPrinterLAN-1.2.2-x64.msi ADDLOCAL=Client /qb
 ```
 
 ## 3. Print
@@ -62,8 +62,8 @@ jobs* (PC2).
 *Settings → Apps → Installed apps → Nexora Printer LAN → ⋯ → Modify* (or run the `.msi` again → *Change*), then
 pick the roles. Or, as Administrator:
 ```powershell
-msiexec /i .\NexoraPrinterLAN-1.2.1-x64.msi ADDLOCAL=Receiver /qb    # add a role
-msiexec /i .\NexoraPrinterLAN-1.2.1-x64.msi REMOVE=Receiver /qb      # remove a role
+msiexec /i .\NexoraPrinterLAN-1.2.2-x64.msi ADDLOCAL=Receiver /qb    # add a role
+msiexec /i .\NexoraPrinterLAN-1.2.2-x64.msi REMOVE=Receiver /qb      # remove a role
 ```
 Restart Nexora Printer LAN (tray → Exit, then start it) after changing roles.
 
@@ -81,7 +81,7 @@ Downgrades are refused. To go back to an older version, uninstall and install th
 *Settings → Apps → Installed apps → Nexora Printer LAN → Uninstall*, Start menu → **Uninstall Nexora Printer LAN**,
 or as Administrator:
 ```powershell
-msiexec /x .\NexoraPrinterLAN-1.2.1-x64.msi /qb
+msiexec /x .\NexoraPrinterLAN-1.2.2-x64.msi /qb
 ```
 This removes the app, the *Nexora Printer LAN* printer and its port, the firewall rules, autostart and shortcuts.
 Settings, pairing codes, job history and received documents in `%LOCALAPPDATA%\Nexora` are kept; delete that

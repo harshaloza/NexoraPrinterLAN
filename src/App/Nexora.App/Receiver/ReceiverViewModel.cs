@@ -79,8 +79,18 @@ public sealed class ReceiverViewModel : ObservableObject
         {
             if (SelectedPrinter is null) return;
             await _host.UpdateConfigAsync(c => c.DestinationPrinter = SelectedPrinter.Name);
+            LoadCalibration();
             Refresh();
         }, () => SelectedPrinter is not null);
+        PrintCalibrationPage = new AsyncCommand(PrintCalibrationPageAsync);
+        ApplyMeasurements = new AsyncCommand(ApplyMeasurementsAsync);
+        ResetCalibration = new AsyncCommand(async () =>
+        {
+            var dest = _host.Config.DestinationPrinter;
+            if (dest is null || !Dialogs.Confirm($"Remove the size calibration for '{dest}' (back to 100% × 100%)?")) return;
+            await _host.UpdateConfigAsync(c => c.SetCalibration(dest, null));
+            LoadCalibration();
+        });
         PrintTestPage = new AsyncCommand(PrintTestPageAsync, () => SelectedPrinter is not null);
         SetTestMode = new AsyncCommand(async p =>
         {
@@ -161,6 +171,20 @@ public sealed class ReceiverViewModel : ObservableObject
     ];
     private PrintScaling _scaling;
     public PrintScaling Scaling { get => _scaling; set => Set(ref _scaling, value); }
+
+    // Size calibration of the destination printer (percent across the paper / along the paper feed).
+    private string _calAcross = "100", _calAlong = "100", _measAcross = "", _measAlong = "", _calPrinter = "";
+    private bool _hasDestination;
+    public string CalibrationAcross { get => _calAcross; set => Set(ref _calAcross, value); }
+    public string CalibrationAlong { get => _calAlong; set => Set(ref _calAlong, value); }
+    public string MeasuredAcross { get => _measAcross; set => Set(ref _measAcross, value); }
+    public string MeasuredAlong { get => _measAlong; set => Set(ref _measAlong, value); }
+    public string CalibrationPrinterText { get => _calPrinter; set => Set(ref _calPrinter, value); }
+    public bool HasDestination { get => _hasDestination; set => Set(ref _hasDestination, value); }
+    public string CalibrationFrameText => $"Measured frame: X should be {TestPdfBuilder.CalibrationAcrossMm:0} mm, Y {TestPdfBuilder.CalibrationAlongMm:0} mm";
+    public AsyncCommand PrintCalibrationPage { get; }
+    public AsyncCommand ApplyMeasurements { get; }
+    public AsyncCommand ResetCalibration { get; }
 
     private XpsPrintMethod _xpsMethod;
     public XpsPrintMethod XpsMethod { get => _xpsMethod; set => Set(ref _xpsMethod, value); }
@@ -270,7 +294,7 @@ public sealed class ReceiverViewModel : ObservableObject
             var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
             {
                 JobId = Guid.NewGuid(), DocumentPath = file, DocumentName = "Nexora test page", PrinterName = printer,
-                Scaling = _host.Config.Scaling, MaxRenderDpi = _host.Config.MaxRenderDpi,
+                Scaling = _host.Config.Scaling, Calibration = _host.Config.CalibrationFor(printer), MaxRenderDpi = _host.Config.MaxRenderDpi,
                 TrackTimeout = TimeSpan.FromMinutes(2),
             }, null, default);
             _host.Log.For("ui").Info("print.testpage", $"Test page on '{printer}': {outcome.State.ToWire()} {outcome.Message}");
@@ -297,6 +321,68 @@ public sealed class ReceiverViewModel : ObservableObject
         Scaling = c.Scaling;
         KeepPrintedCopies = c.KeepPrintedCopies;
         XpsMethod = c.XpsPrintMethod;
+        LoadCalibration();
+    }
+
+    private void LoadCalibration()
+    {
+        var dest = _host.Config.DestinationPrinter;
+        HasDestination = dest is not null;
+        CalibrationPrinterText = dest is null ? "Choose a destination printer on the Printers page first." : $"Printer: {dest}";
+        var cal = _host.Config.CalibrationFor(dest) ?? new PrintCalibration();
+        CalibrationAcross = cal.AcrossPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        CalibrationAlong = cal.AlongFeedPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        MeasuredAcross = MeasuredAlong = "";
+    }
+
+    private static double ParseNumber(string text, string what)
+    {
+        if (double.TryParse(text.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)) return v;
+        throw new FormatException($"{what}: '{text}' is not a number");
+    }
+
+    private async Task PrintCalibrationPageAsync()
+    {
+        var dest = _host.Config.DestinationPrinter;
+        if (dest is null) { Dialogs.Error("Choose a destination printer on the Printers page first."); return; }
+        if (!Dialogs.Confirm($"Print the size calibration page on '{dest}' now?")) return;
+        var cal = _host.Config.CalibrationFor(dest);
+        var file = Path.Combine(Path.GetTempPath(), $"nexora-calibration-{Guid.NewGuid():N}.pdf");
+        File.WriteAllBytes(file, TestPdfBuilder.BuildCalibrationPage(dest, cal?.ToString() ?? "no size calibration (100% x 100%)"));
+        try
+        {
+            var outcome = await new GdiPdfPrinter().PrintAsync(new PrintRequest
+            {
+                JobId = Guid.NewGuid(), DocumentPath = file, DocumentName = "Nexora size calibration page", PrinterName = dest,
+                Scaling = PrintScaling.Auto, Calibration = cal, MaxRenderDpi = _host.Config.MaxRenderDpi,
+                TrackTimeout = TimeSpan.FromMinutes(2),
+            }, null, default);
+            _host.Log.For("ui").Info("print.calibration", $"Calibration page on '{dest}': {outcome.State.ToWire()} {outcome.Message}");
+            Dialogs.Info($"{outcome.State.ToDisplay()}: {outcome.Message}\n\nMeasure the outer frame with a ruler: X across the paper (should be {TestPdfBuilder.CalibrationAcrossMm:0} mm) and Y along the paper (should be {TestPdfBuilder.CalibrationAlongMm:0} mm). Enter both under Size calibration and click Apply measurements.");
+        }
+        finally
+        {
+            try { File.Delete(file); } catch { }
+        }
+    }
+
+    private async Task ApplyMeasurementsAsync()
+    {
+        var dest = _host.Config.DestinationPrinter;
+        if (dest is null) { Dialogs.Error("Choose a destination printer on the Printers page first."); return; }
+        try
+        {
+            double mx = ParseNumber(MeasuredAcross, "Measured X"), my = ParseNumber(MeasuredAlong, "Measured Y");
+            var current = _host.Config.CalibrationFor(dest) ?? new PrintCalibration();
+            var next = current.FromMeasurement(TestPdfBuilder.CalibrationAcrossMm, mx, TestPdfBuilder.CalibrationAlongMm, my);
+            await _host.UpdateConfigAsync(c => c.SetCalibration(dest, next));
+            LoadCalibration();
+            Dialogs.Info($"'{dest}' now prints with {next}.\n\nPrint the calibration page again to check: the frame should now measure {TestPdfBuilder.CalibrationAcrossMm:0} × {TestPdfBuilder.CalibrationAlongMm:0} mm.");
+        }
+        catch (Exception e) when (e is FormatException or InvalidOperationException)
+        {
+            Dialogs.Error(e.Message);
+        }
     }
 
     private async Task DoSaveSettingsAsync()
@@ -304,6 +390,10 @@ public sealed class ReceiverViewModel : ObservableObject
         try
         {
             var nets = AllowedNetworks.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).ToList();
+            var dest = _host.Config.DestinationPrinter;
+            var cal = new PrintCalibration(ParseNumber(CalibrationAcross, "Calibration X"), ParseNumber(CalibrationAlong, "Calibration Y"));
+            cal.Validate();
+            if (dest is null && !cal.IsNone) throw new InvalidOperationException("Choose a destination printer before setting a size calibration.");
             await _host.UpdateConfigAsync(c =>
             {
                 c.ReceiverName = string.IsNullOrWhiteSpace(ReceiverName) ? Environment.MachineName : ReceiverName.Trim();
@@ -316,6 +406,7 @@ public sealed class ReceiverViewModel : ObservableObject
                 c.MaxRenderDpi = int.Parse(MaxDpi);
                 c.DiscoveryEnabled = DiscoveryEnabled;
                 c.Scaling = Scaling;
+                if (dest is not null) c.SetCalibration(dest, cal);
                 c.KeepPrintedCopies = KeepPrintedCopies;
                 c.XpsPrintMethod = XpsMethod;
             });

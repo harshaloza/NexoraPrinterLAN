@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.2 — 2026-11-21
+
+### Added
+- **Size calibration per printer** (Receiver → Settings → *Size calibration*) for printers that print slightly too long
+  or short in one direction, typically along the paper feed of a laser printer (e.g. X correct, Y 1% short).
+  *Print calibration page* prints a 150 × 250 mm frame; enter the measured X and Y and click *Apply measurements*.
+  The correction (90–110% across and along the paper, swapped automatically for landscape pages) applies to every job
+  on that printer, vector and image printing alike, and the job status shows it.
+- CLI: `print --calibration ACROSS,ALONG`.
+
 ## 1.2.1 — 2026-11-19
 
 ### Fixed

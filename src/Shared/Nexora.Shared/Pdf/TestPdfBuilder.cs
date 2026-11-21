@@ -52,6 +52,46 @@ public static class TestPdfBuilder
         return pdf;
     }
 
+    /// <summary>Frame measured for printer size calibration: across × along the paper feed, in mm, on portrait A4.</summary>
+    public const double CalibrationAcrossMm = 150, CalibrationAlongMm = 250;
+
+    /// <summary>
+    /// One portrait A4 page with a centred 150 × 250 mm frame (thin lines, 10 mm ticks on two edges) to measure for
+    /// printer size calibration. It must be printed at 100% (true scale).
+    /// </summary>
+    public static byte[] BuildCalibrationPage(string printer, string currentCalibration)
+    {
+        var (w, h) = A4;
+        const double mm = 72 / 25.4;
+        double fw = CalibrationAcrossMm * mm, fh = CalibrationAlongMm * mm;
+        double x0 = (w - fw) / 2, y0 = (h - fh) / 2;
+        var c = new StringBuilder();
+        c.Append($"0.25 w {F(x0)} {F(y0)} {F(fw)} {F(fh)} re S\n");
+        for (int i = 1; i < CalibrationAcrossMm / 10; i++) c.Append($"{F(x0 + i * 10 * mm)} {F(y0 + fh)} m {F(x0 + i * 10 * mm)} {F(y0 + fh - (i % 5 == 0 ? 6 : 3) * mm)} l S\n");
+        for (int i = 1; i < CalibrationAlongMm / 10; i++) c.Append($"{F(x0)} {F(y0 + i * 10 * mm)} m {F(x0 + (i % 5 == 0 ? 6 : 3) * mm)} {F(y0 + i * 10 * mm)} l S\n");
+        double tx = x0 + 14 * mm, ty = y0 + fh - 18 * mm;
+        void Line(int size, string text) { c.Append($"BT /F1 {size} Tf {F(tx)} {F(ty)} Td ({Escape(text)}) Tj ET\n"); ty -= size + 6; }
+        Line(16, "Nexora size calibration page");
+        Line(10, $"Printer: {printer}");
+        Line(10, $"Printed with: {currentCalibration}");
+        ty -= 8;
+        Line(10, $"Measure the outer frame with a ruler:");
+        Line(10, $"  X = width across the paper, should be {CalibrationAcrossMm:0} mm");
+        Line(10, $"  Y = height along the paper feed, should be {CalibrationAlongMm:0} mm");
+        Line(10, "Enter both measurements in Nexora: Settings > Size calibration.");
+        Line(10, "Ticks every 10 mm; long ticks every 50 mm.");
+
+        var objects = new List<byte[]>
+        {
+            Ascii("<< /Type /Catalog /Pages 2 0 R >>"),
+            Ascii("<< /Type /Pages /Kids [4 0 R] /Count 1 >>"),
+            Ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+            Ascii($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {F(w)} {F(h)}] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>"),
+            Stream(Encoding.ASCII.GetBytes(c.ToString())),
+        };
+        return Assemble(objects, extraBeforeXref: null);
+    }
+
     private static byte[] Assemble(List<byte[]> objects, byte[]? extraBeforeXref)
     {
         using var ms = new MemoryStream();

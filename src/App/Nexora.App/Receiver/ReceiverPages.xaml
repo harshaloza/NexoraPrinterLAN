@@ -176,6 +176,32 @@
                         </Grid>
                     </StackPanel>
                 </Border>
+                <Border Style="{StaticResource Card}" Width="400" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Size calibration" Style="{StaticResource H2}"/>
+                        <TextBlock Style="{StaticResource Muted}" Text="{Binding CalibrationPrinterText}"/>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,2,0,0" Text="Corrects a printer that prints slightly too long or short (usually along the paper feed). 1. Print the calibration page. 2. Measure its frame. 3. Enter the measurements and click Apply."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Print calibration page" Command="{Binding PrintCalibrationPage}" IsEnabled="{Binding HasDestination}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding CalibrationFrameText}" Style="{StaticResource FieldLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="Measured X (mm)" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding MeasuredAcross}" MinWidth="0"/></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Measured Y (mm)" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding MeasuredAlong}" MinWidth="0"/></StackPanel>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Apply measurements" Command="{Binding ApplyMeasurements}" IsEnabled="{Binding HasDestination}" Margin="0,0,8,0"/>
+                            <Button Content="Reset" Command="{Binding ResetCalibration}" IsEnabled="{Binding HasDestination}"/>
+                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="X across the paper (%)" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding CalibrationAcross}" MinWidth="0" IsEnabled="{Binding HasDestination}"/></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Text="Y along the paper feed (%)" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding CalibrationAlong}" MinWidth="0" IsEnabled="{Binding HasDestination}"/></StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" Text="Current correction (90–110%). You can also type values here and save. On landscape pages the paper feed runs along the page's width; Nexora handles that."/>
+                    </StackPanel>
+                </Border>
             </WrapPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
                 <Button Style="{StaticResource Primary}" Content="Save receiver settings" Command="{Binding SaveSettings}"/>

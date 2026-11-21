@@ -1,5 +1,19 @@
 # Nexora Printer LAN — Test report
 
+## 1.2.2: per-printer size calibration (2026-11-21, PC1)
+
+Reported by the user after 1.2.1: X printed correctly, Y did not. Nexora scales X and Y by the same factor (driver
+600 × 600 dpi, uniform placement in both print paths), so a one-direction error points to the printer's paper feed.
+Automated: **95/95 unit, 26/26 integration passed** (Release, SDK 10.0.404).
+
+| Test | Result |
+|---|---|
+| Calibration maths: portrait stretches along the feed only; landscape swaps the two corrections; none = unchanged; new correction from measurement relative to the current one; 90–110% limit refuses mistyped measurements | Passed (unit) |
+| Calibration stored per printer (case-insensitive), survives save/load, 100% × 100% removes it; calibration page is a valid 1-page PDF | Passed (unit) |
+| Calibration page printed through *Microsoft Print to PDF* (image path) and measured in the output: frame 150 × 250 mm within ±0.7 mm without calibration; with 102% along the feed only the height grows, by 2% (±0.3%) | Passed (integration) |
+| Calibration on the vector (XPS) path, measured | **Not tested** — no vector-capable test queue on PC1; same placement code |
+| Canon LBP2900 calibrated with the calibration page; AutoCAD 1:1 plot measured in X and Y | **Not tested** — needs PC2 |
+
 ## 1.2.1: true-scale printing (2026-11-19, PC1)
 
 Reported by the user: printing from PC1 to PC2's Canon works, including AutoCAD 2007, but 1:1 plots came out
